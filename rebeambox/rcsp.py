@@ -131,3 +131,78 @@ def parse_read_request(payload):
     return offset, size
 
 AUTH_RESET_FRAME = bytes.fromhex("FEDCBAC00600020001EF")  # raw: flag C0, opcode 06, len 2, payload 00 01 (no sn byte)
+
+
+# --- device info parsing -----------------------------------------------------
+def parse_ltv(buf):
+    """Records `len type data` where len counts the type byte plus data."""
+    out, i = [], 0
+    while i < len(buf):
+        n = buf[i]
+        if n < 1 or i + 1 + n > len(buf):
+            break
+        out.append((buf[i + 1], bytes(buf[i + 2:i + 1 + n])))
+        i += 1 + n
+    return out
+
+def parse_target_info(payload):
+    """GetTargetInfo reply -> dict(mtu, crc16). Defaults: MTU 530, no packet CRC."""
+    info = {"mtu": 530, "crc16": False, "raw": dict(parse_ltv(payload))}
+    for t, d in parse_ltv(payload):
+        if t == 13 and len(d) >= 2:
+            info["mtu"] = struct.unpack(">H", d[:2])[0]
+        elif t == 21 and len(d) >= 4:
+            info["crc16"] = bool(struct.unpack(">I", d[:4])[0] & 1)
+    return info
+
+STORAGE_NAMES = {0: "USB", 1: "SD Card 0", 2: "SD Card 1", 3: "Flash", 4: "LineIn", 5: "Flash2", 6: "Flash3"}
+
+def parse_sys_info(payload):
+    """GetSysInfo reply -> {attr_type: bytes}. First byte is the function code."""
+    attrs, i = {}, 1
+    while i < len(payload):
+        n = payload[i]
+        if n < 1 or i + 1 + n > len(payload):
+            break
+        attrs[payload[i + 1]] = bytes(payload[i + 2:i + 1 + n])
+        i += 1 + n
+    return attrs
+
+def parse_storage(data):
+    """Storage attribute -> list of dict(index, name, online, handle)."""
+    out = []
+    if not data:
+        return out
+    if data[0] == 0xFF:                       # new layout: FF version LTV...
+        for t, d in parse_ltv(data[2:]):
+            if t == 1:
+                i = 0
+                while i + 2 <= len(d):
+                    online, idx = d[i] == 1, d[i + 1]
+                    handle = None
+                    n = 2
+                    if online and i + 6 <= len(d):
+                        handle = struct.unpack(">I", d[i + 2:i + 6])[0]; n = 6
+                    out.append({"index": idx, "name": STORAGE_NAMES.get(idx, "?"), "online": online, "handle": handle})
+                    i += n
+    else:                                     # legacy: online bitmask then u32 handles (index 4 has none)
+        mask, i = data[0], 1
+        for idx in range(6):
+            handle = None
+            if idx != 4:
+                if i + 4 > len(data):
+                    break
+                handle = struct.unpack(">I", data[i:i + 4])[0]; i += 4
+            out.append({"index": idx, "name": STORAGE_NAMES.get(idx, "?"), "online": bool(mask >> idx & 1), "handle": handle})
+    return out
+
+def pick_storage(entries):
+    """App rule: online 'SD Card 1' first, else first online USB or SD (indices 0,1,2)."""
+    on = [e for e in entries if e["online"] and e["handle"] is not None]
+    for e in on:
+        if e["index"] == 2:
+            return e
+    for e in on:
+        if e["index"] in (0, 1, 2):
+            return e
+    return None

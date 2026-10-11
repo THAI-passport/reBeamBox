@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rebeambox"
+version = "0.1.0"
+description = "Open client for Beambox-style round e-badges over Bluetooth LE (untested on hardware)"
+requires-python = ">=3.10"
+dependencies = ["bleak>=0.22", "Pillow>=10.1"]
+
+[project.optional-dependencies]
+dev = ["pytest", "pytest-asyncio", "unicorn", "pyelftools", "capstone"]
+
+[project.scripts]
+rebeambox = "rebeambox.cli:main"
+
+[tool.setuptools]
+packages = ["rebeambox"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

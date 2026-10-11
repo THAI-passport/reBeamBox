@@ -1,9 +1,10 @@
 """Software badges used for --dry-run and tests. They implement the badge side of the documented protocol."""
 import json
+import re
 import os
 import struct
 
-from . import control, jl_auth, nn20, rcsp
+from . import control, jl_auth, nn20, rcsp, wifi
 
 AE00 = "0000ae00-0000-1000-8000-00805f9b34fb"
 AE01 = "0000ae01-0000-1000-8000-00805f9b34fb"
@@ -197,3 +198,87 @@ class SimNn20(SimBadge):
     def stream(self):
         """Reassembled envelope bytes."""
         return b"".join(p[8:-1] for p in self.packets)
+
+
+class SimWifiBadge:
+    """Software badge for the Wi-Fi path. Handles both connection kinds on one port: control words /
+    camera frames, and HTTP POST /upload."""
+
+    def __init__(self, free_kb=12000, refuse=False):
+        self.free_kb, self.refuse = free_kb, refuse
+        self.files = {}          # name -> bytes
+        self.frames = []         # camera frames received
+        self.finished = 0
+        self.camera_open = False
+        self.conns = []
+
+    def new_conn(self, push):
+        c = _WifiConn(self, push)
+        self.conns.append(c)
+        return c
+
+
+class _WifiConn:
+    def __init__(self, badge, push):
+        self.b, self.push, self.buf = badge, push, b""
+        self.http = None
+
+    def feed(self, data):
+        self.buf += data
+        while self._step():
+            pass
+
+    def _step(self):
+        b = self.b
+        if self.http is None and self.buf[:5] == b"POST ":
+            end = self.buf.find(b"\r\n\r\n")
+            if end < 0:
+                return False
+            head = self.buf[:end].decode("latin-1")
+            name = re.search(r"X-Filename:\s*(\S+)", head, re.I).group(1)
+            length = int(re.search(r"Content-Length:\s*(\d+)", head, re.I).group(1))
+            self.http = (name, length)
+            self.buf = self.buf[end + 4:]
+        if self.http is not None:
+            name, length = self.http
+            if len(self.buf) < length:
+                return False
+            b.files[name] = self.buf[:length]
+            self.buf = self.buf[length:]
+            self.http = None
+            self.push(b"HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n")
+            return True
+        if len(self.buf) < 2:
+            return False
+        w = self.buf[:2]
+        if not b.camera_open:
+            self.buf = self.buf[2:]
+            if w == wifi.CMD_QUERY:
+                if b.refuse:
+                    self.push(wifi.REPLY_FAIL)
+                else:
+                    self.push(b"SD:%dKB" % b.free_kb + wifi.REPLY_OK)
+            elif w == wifi.CMD_FINISH:
+                b.finished += 1
+            elif w == wifi.CMD_CAM_START:
+                b.camera_open = True
+                self.push(wifi.REPLY_CAM_OPEN)
+            return True
+        # camera mode: [len16][jpeg][0000] frames or stop word
+        n = int.from_bytes(w, "big")
+        if w == wifi.CMD_CAM_STOP:
+            self.buf = self.buf[2:]
+            b.camera_open = False
+            self.push(wifi.REPLY_CAM_CLOSED)
+            return True
+        if n == 0 or w == wifi.CMD_SHOT_DONE:
+            self.buf = self.buf[2:]
+            return True
+        if len(self.buf) < 2 + n + 2:
+            return False
+        b.frames.append(self.buf[2:2 + n])
+        self.buf = self.buf[2 + n + 2:]
+        return True
+
+    def shutter(self):
+        self.push(wifi.REPLY_SHOT)

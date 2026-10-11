@@ -1,7 +1,7 @@
 """High level send flows used by the CLI."""
 import asyncio
 
-from . import media, nn20, control
+from . import media, nn20, control, wifi
 from .session import AE00, BadgeSession, Nn20Session, ProtocolError
 
 
@@ -27,6 +27,26 @@ class Job:
         if self.kind == "still":      # hardware report: Niji shows black for type 6, works as a one-frame animation
             return nn20.TYPE_GIF, nn20.gif_container(jpegs[:1], self.still_interval_ms, size, size)
         return nn20.TYPE_GIF, nn20.gif_container(jpegs, interval, size, size)
+
+
+def wifi_payload(job, size=wifi.WIFI_SIZE, still_mode="imb"):
+    """Container file for the Wi-Fi path: IMB for stills (app: single_wifi), animation container with the
+    Wi-Fi address-list length otherwise. Interval default 44 ms as in the app's Wi-Fi animation call."""
+    frames, interval = job.frames_fn(size)
+    jpegs = [media.to_jpeg(f, job.quality) for f in frames]
+    if job.kind == "still":
+        if still_mode == "gif":
+            return nn20.gif_container(jpegs[:1], job.still_interval_ms, size, size, wifi=True)
+        return nn20.imb(size, size, jpegs[0])
+    return nn20.gif_container(jpegs, interval or 44, size, size, wifi=True)
+
+
+async def send_wifi(job, open_channel, host=wifi.HOST, port=wifi.PORT, size=None, still_mode="imb", log=print,
+                    progress=None, pace=True):
+    data = wifi_payload(job, size or wifi.WIFI_SIZE, still_mode)
+    s = wifi.WifiSession(open_channel, host, port, log, pace)
+    await s.send_file(data, progress=progress)
+    return data
 
 
 def detect_transport(link):

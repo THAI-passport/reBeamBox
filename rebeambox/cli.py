@@ -3,7 +3,7 @@ import argparse
 import asyncio
 import sys
 
-from . import __version__, client, link, media, models, scan as scanmod, sim
+from . import __version__, client, link, media, models, scan as scanmod, sim, wifi
 
 
 def _add_common(p):
@@ -12,7 +12,10 @@ def _add_common(p):
     p.add_argument("--timeout", type=float, default=8.0, help="scan seconds")
     p.add_argument("--size", type=int, help="override picture size (default: what the badge reports, else 360)")
     p.add_argument("--square", action="store_true", help="do not apply the circular mask")
-    p.add_argument("--transport", choices=["badge", "nn20"], help="force a transport (default: service discovery)")
+    p.add_argument("--transport", choices=["badge", "nn20", "wifi"], help="force a transport (default: BLE service discovery; wifi needs the badge access point joined)")
+    p.add_argument("--host", default=wifi.HOST, help="Wi-Fi badge address")
+    p.add_argument("--port", type=int, default=wifi.PORT, help="Wi-Fi badge TCP port")
+    p.add_argument("--wifi-still", choices=["imb", "gif"], default="imb", help="Wi-Fi still container (imb = app behaviour)")
     p.add_argument("--dry-run", metavar="FILE", help="no Bluetooth: write every frame to FILE (and FILE.payload)")
     p.add_argument("--pic", type=int, nargs=2, metavar=("W", "H"), default=(360, 360),
                    help="simulated badge picture size for --dry-run")
@@ -37,6 +40,9 @@ def build_parser():
     p = sub.add_parser("send-video", help="send a video (first 3 s)"); p.add_argument("path"); _add_common(p)
     p.add_argument("--max-seconds", type=float, default=None, help="cap in seconds (default 3, or the --model profile)")
     p.add_argument("--fps", type=int, default=15)
+    p = sub.add_parser("stream", help="Wi-Fi live frames from a video or GIF (max 3.3 fps, 30 KB per frame)")
+    p.add_argument("path"); _add_common(p); p.add_argument("--fps", type=float, default=2.0)
+    p.add_argument("--max-seconds", type=float, default=10.0)
     p = sub.add_parser("send-text", help="render text or a name tag and send it"); p.add_argument("text"); _add_common(p)
     p.add_argument("--subtitle"); p.add_argument("--fg", default="#ffffff"); p.add_argument("--bg", default="#000000")
     p.add_argument("--font", help="path to a .ttf (use a Thai-capable font for Thai text)")
@@ -88,8 +94,53 @@ def _video(args, size, circ):
     return frames, 1000 // args.fps
 
 
+def _wifi_dump(path, log_events, payload):
+    with open(path, "w") as fh:
+        fh.write("# rebeambox wifi dry run: W = written by us, N = simulated badge reply\n")
+        fh.write("# columns: direction, connection, length, bytes (long writes truncated to 64 bytes in this log)\n")
+        for d, name, b in log_events:
+            fh.write("%s %s %d %s%s\n" % (d, name, len(b), b[:64].hex(" ").upper(), " ..." if len(b) > 64 else ""))
+    with open(path + ".payload", "wb") as fh:
+        fh.write(payload)
+
+
+def _stream_frames(args):
+    frames = media.load_video_frames(args.path, wifi.WIFI_SIZE, not args.square, max(1, round(args.fps)), args.max_seconds) \
+        if not args.path.lower().endswith(".gif") else media.load_gif_frames(args.path, wifi.WIFI_SIZE, not args.square, args.max_seconds)[0]
+    return [wifi.jpeg_under(f) for f in frames]
+
+
+async def _run_wifi(args, log):
+    prof = models.get(getattr(args, "model", None))
+    if prof and args.size == prof.size:
+        args.size = None          # the profile size is a BLE value; Wi-Fi uses 360 unless --size is given
+    pace = not args.dry_run
+    events = []
+    if args.dry_run:
+        badge = sim.SimWifiBadge()
+        mk = lambda name: wifi.SimChannel(badge, name, events)
+    else:
+        mk = lambda name: wifi.TcpChannel()
+    if args.cmd == "stream":
+        frames = _stream_frames(args)
+        s = wifi.WifiSession(mk, args.host, args.port, log, pace)
+        n = await s.stream(frames, args.fps)
+        log("sent %d frames" % n)
+        payload = b"".join(frames)
+    else:
+        payload = await client.send_wifi(make_job(args), mk, args.host, args.port, args.size, args.wifi_still, log,
+                                         None if args.quiet else (lambda p: print("\r%3d%%" % p, end="", file=sys.stderr)), pace)
+    if args.dry_run:
+        _wifi_dump(args.dry_run, events, payload)
+        log("wrote %d events to %s (payload %d bytes in %s.payload)" % (len(events), args.dry_run, len(payload), args.dry_run))
+    return 0
+
+
 async def _run_send(args):
     log = (lambda *_: None) if args.quiet else (lambda m: print(m, file=sys.stderr))
+    if args.cmd == "stream" or args.transport == "wifi":
+        apply_model(args)
+        return await _run_wifi(args, log)
     job = make_job(args)
     if args.dry_run:
         tr = args.transport or ("nn20" if args.model else "badge")

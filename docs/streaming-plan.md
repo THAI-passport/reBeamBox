@@ -81,3 +81,22 @@ Show a live feed (screen, camera, canvas or video) from the phone on the 360x360
 3. Pre-render animations on the phone and upload once, driving content changes (clock, weather, status) rather than video.
 4. Wi-Fi SoftAP transport only for models that have it (nn20 sibling product: 192.168.8.1:8080).
 5. Custom firmware as a last resort, after Phase 0 to 4 evidence and with a recovery plan.
+
+
+## Appendix: realistic fps and bandwidth, Wi-Fi versus BLE (added with the Wi-Fi analysis)
+Numbers marked [C] come from app constants, [I] are arithmetic estimates for planning, none are measured on hardware.
+
+| Path | Constraint from code | Payload per frame | Upper bound | Realistic target |
+|---|---|---|---|---|
+| Wi-Fi live camera (TCP 8080, docs/wifi-protocol.md) | [C] frames at least 300 ms apart (3.3 fps); JPEG 360 x 360 at quality 10, warn above 30720 bytes | 6 to 30 KB | [I] 30 KB x 3.3 = 100 KB/s (0.8 Mbit/s), well below Wi-Fi capacity | 3 fps proven by the app; try 5 to 10 fps with 8 to 12 KB frames [I]; the limit is probably the badge JPEG decoder and display refresh [U] |
+| Wi-Fi file upload (POST /upload) | [C] 6144-byte chunks, 1 to 3 ms sleep per chunk | 15 to 400 KB container | [I] 6144 / 3 ms = 2 MB/s | a 100 KB animation in about 0.1 to 0.5 s; faster than BLE by 50x or more |
+| BLE nn20 no-ACK mode | [C] 20 ms between packets, about 446 data bytes per packet at MTU 512 | 10 to 15 KB JPEG | [I] 446 / 0.02 = 22 KB/s | 1.5 to 2 fps for 12 KB stills, 0.5 fps for 30 KB |
+| BLE nn20 ACK mode | [C] interval at least 50 ms, batches of 4, wait for GetPacketSuccess | same | [I] about 9 KB/s | under 1 fps |
+| BLE BadgeSdk (RCSP file transfer) | [C] MTU negotiation, device-pulled blocks, CRC | same | [I] 10 to 30 KB/s | under 1 fps |
+
+Conclusions:
+1. Live video is only realistic over Wi-Fi: the app has a live frame path there and no live path over BLE.
+2. For a Wi-Fi model, implement phase 4 strategy as `rebeambox stream` first (already in the client): measure real badge fps by raising `--fps` from 2 to 10 and watching the 0x007A/0x007B/0x007F replies and visual stutter.
+3. For BLE-only models (Nano, Niji by third-party reports) the best is a slideshow: pre-render an animation and upload it once (3 to 5 s clips), or push stills at under 1 fps.
+4. Keep the Wi-Fi frame under 30720 bytes regardless of what the badge tolerates; the client enforces this by lowering JPEG quality.
+5. Check whether a given badge has Wi-Fi at all before planning around it: see docs/first-session-checklist.md, step 2 (scan for an `E-Badge` access point).

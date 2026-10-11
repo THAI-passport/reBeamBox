@@ -3,3 +3,4 @@ analysis/apk/
 analysis/decompiled/
 .venv/
 __pycache__/
+analysis/work/

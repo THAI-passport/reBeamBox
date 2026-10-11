@@ -97,8 +97,8 @@ def apply_model(args):
     prof = models.get(getattr(args, "model", None))
     if prof:
         args.name = list(args.name) + list(prof.names)
-        if args.size is None:
-            args.size = prof.size
+        # The profile size is only the fallback inside the client (368 when the badge reports nothing); it must not
+        # override the size the badge reports, so args.size stays None unless --size is given.
     if hasattr(args, "max_seconds") and args.max_seconds is None:
         args.max_seconds = prof.video_max_s if prof else media.MAX_SECONDS
     args.still_mode = args.nn20_still or (prof.still_mode if prof else "gif")
@@ -160,8 +160,6 @@ async def _run_stream(args, log):
     src = streaming.open_source(args.path, args.source_fps, args.max_seconds)
     events, sink = [], None
     if transport == "wifi":
-        if args.model and args.size == models.get(args.model).size:
-            args.size = None
         if dry:
             badge = sim.SimWifiBadge()
             mk = lambda name: wifi.SimChannel(badge, name, events)
@@ -215,8 +213,6 @@ async def _run_stream(args, log):
 
 async def _run_wifi(args, log):
     prof = models.get(getattr(args, "model", None))
-    if prof and args.size == prof.size:
-        args.size = None          # the profile size is a BLE value; Wi-Fi uses 360 unless --size is given
     pace = not args.dry_run
     events = []
     if args.dry_run:

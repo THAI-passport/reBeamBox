@@ -351,3 +351,10 @@ Entry format: date, phase, problem, cause, solution (or Status: Unsolved plus wh
 - Problem: the client used an integer fps (`-r 15`) and a fixed -t, the app uses `-r %.3f` from 1000/interval and duration = frames*interval/1000.
 - Cause: the first reading of the builder summarised the command but not the number formatting.
 - Solution: `avi_command` and `Job.badge_payload` follow the exact formulas; tests updated. Impact on a real badge is Unknown (likely none).
+
+## 50. Wi-Fi camera 127-byte ambiguity: reasoning and mitigation
+- Date: 2026-10-11
+- Phase: Wi-Fi gaps
+- Problem: How does the badge tell a 2-byte frame length from the stop word 0x007F (entry 37)?
+- Cause: The app sends no type byte; stop is `00 7F 00 00`, the same shape as a frame with length 127. Firmware cannot be read from the APK.
+- Solution: Code review shows all control words have a zero high byte (frame length below 256) and the app never sends such a small frame. Inferred rule: first byte 0x00 means command. Client now pads frames below 256 bytes with a JPEG comment segment (`wifi.pad_jpeg`). Status: firmware rule Unknown; resource strings give no model-to-Wi-Fi mapping (wifi-protocol.md 5.2).

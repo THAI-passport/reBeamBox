@@ -54,6 +54,17 @@ Frame format [C]:
 - Frame rate limit: [C] a frame is skipped if less than 300 ms passed since the last sent frame, so at most 3.3 fps; the screen shows the measured FPS.
 - [U] Whether the badge applies a circular mask, rotation or colour correction. The app sends upright square images.
 
+### 5.1 Length prefix versus stop words (the 127-byte ambiguity) [C for what the app sends, I for the firmware]
+- [C] The app has no type byte. Every camera frame is three writes: a 2-byte big-endian length, the JPEG, and `00 00`. The stop request is the same shape: `00 7F` (a "length" of 127) followed by `00 00`, with no body. Other control words (`00 69`, `00 5F`, `00 79`, `00 7D`) are also two bytes with a zero high byte. The app has no guard for small frames and the socket read loop polls every 10 ms for replies.
+- [C] Every control word has a zero high byte, so it equals a frame length below 256. A 360 x 360 JPEG at quality 10 is never that small, so the app never produces a collision in practice.
+- [I] The firmware therefore most likely treats a first byte of 0x00 at a frame boundary as a command word and anything else as the high byte of a frame length. The alternative (it reads `len` bytes after any prefix) is contradicted by the stop request, which sends no body. The exact firmware rule cannot be read from the APK; hardware test H5 should send a frame with length 127 only if a reset is acceptable.
+- Client rule: `wifi.pad_jpeg` pads any frame below 256 bytes with a JPEG comment segment, so no length prefix has a zero high byte; frames above 30720 bytes are dropped. Tests: `tests/test_sw_wifi_edges.py`.
+
+### 5.2 Which models use Wi-Fi: resource and string hints [C strings, I verdict]
+- [C] `home_string_35`: "enable your device's WiFi and connect to signal E-Badge-xxx" (the SSID prefix, also the default product signal name). `home_string_39`: "disconnect your device from WiFi before editing" (the badge access point has no internet, editing needs the phone off it). `toaster_tips_31`: "Please connect Bluetooth or WiFi first" (the app treats BLE and Wi-Fi as alternative connections). `toaster_tips_13` and `_16`: "WiFi upload failed" and "WiFi transferring". `legacy_layout_text_006` "WiFi upload".
+- [C] `WiFiDeviceActivity` lists scan results whose SSID contains the stored signal name (`keySignalName`), then connects; it has no model names. Strings about 2.4 GHz only, Wi-Fi password and SSID entry (`pets_string_*`, `legacy_layout_text_038`) belong to unrelated flows and are not part of the badge protocol.
+- [I] Nothing in the APK names a model as Wi-Fi. The only selector is the server `deviceType`. The `E-Badge` SSID prefix and the BLE name `E-badge` shown by Nano and Niji suggest the same product-name family, but that is not evidence of a Wi-Fi radio.
+
 ## 6. File upload (stills, GIF, video) [C unless marked]
 1. Control: `00 69`, read reply, parse `SD:<n>KB` (free KB); the app compares it with the file size before building the payload.
 2. Build a container file in memory: stills with the 36-byte IMB header (`BinConverter` method for single images, tag `single_wifi`), animations with the 0x12345678 container using the Wi-Fi variant (address list length N*16+32 rather than N*16+24; PROTOCOL.md 3.6). The app calls the animation builder with a frame interval of 44 ms for the single-image add path. The app also writes the file to its cache as `S`/`M`/`V`/`G` plus two digits and `.bin`.

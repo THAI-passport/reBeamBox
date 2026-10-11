@@ -48,6 +48,20 @@ def parse_free_kb(reply):
     return int(m.group(1)) if m else None
 
 
+MIN_JPEG = 256     # lengths below 256 have a zero high byte, the same shape as the control words (0x0069 ... 0x007F)
+
+
+def pad_jpeg(jpeg, minimum=MIN_JPEG):
+    """Insert a JPEG comment segment after SOI so a frame is at least `minimum` bytes. The length prefix of a smaller
+    frame would look like a control word (docs/wifi-protocol.md 5.1). Real 360x360 frames are far larger."""
+    if len(jpeg) >= minimum:
+        return jpeg
+    if jpeg[:2] != b"\xff\xd8":
+        raise ValueError("not a JPEG")
+    need = max(4, minimum - len(jpeg))
+    return jpeg[:2] + b"\xff\xfe" + (need - 2).to_bytes(2, "big") + bytes(need - 4) + jpeg[2:]
+
+
 def camera_frame(jpeg):
     if len(jpeg) > 0xFFFF:
         raise ValueError("frame too large")
@@ -197,6 +211,8 @@ class WifiSession:
                     self.dropped += 1
                     self.log("dropped frame of %d bytes (limit %d)" % (len(jpeg), MAX_JPEG))
                     continue
+                if len(jpeg) < MIN_JPEG:
+                    jpeg = pad_jpeg(jpeg)
                 await ctrl.send(camera_frame(jpeg))
                 n += 1
                 if progress:

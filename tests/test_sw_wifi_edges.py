@@ -55,7 +55,7 @@ def test_oversize_frames_are_dropped_not_sent():
         sent = await s.stream([ok1, too_big, ok2])
         return b, s, sent, ok1, ok2
     b, s, sent, ok1, ok2 = run(go())
-    assert sent == 2 and s.dropped == 1 and b.frames == [ok1, ok2] and not b.camera_open
+    assert sent == 2 and s.dropped == 1 and b.frames == [ok1, wifi.pad_jpeg(ok2)] and not b.camera_open
 
 
 def test_embedded_stop_and_end_words_do_not_split_a_frame():
@@ -132,3 +132,24 @@ def test_shutter_event_is_acknowledged_with_007d_during_stream():
     s, ch = run(go())
     writes = [e[2] for e in ch.log if e[0] == "W"]
     assert s.shots == 1 and wifi.CMD_SHOT_DONE in writes
+
+
+def test_pad_jpeg_keeps_a_small_frame_out_of_control_word_range():
+    tiny = b"\xff\xd8\xff\xd9"
+    p = wifi.pad_jpeg(tiny)
+    assert len(p) == wifi.MIN_JPEG and p[:2] == b"\xff\xd8" and p[-2:] == b"\xff\xd9" and p[2:4] == b"\xff\xfe"
+    assert int.from_bytes(p[4:6], "big") == len(p) - 6          # SOI, marker and EOI are outside the segment length
+    big = b"\xff\xd8" + bytes(range(256)) * 2
+    assert wifi.pad_jpeg(big) == big
+    assert len(wifi.pad_jpeg(b"\xff\xd8" + bytes(251))) == 257   # smallest comment segment is 4 bytes
+    with pytest.raises(ValueError):
+        wifi.pad_jpeg(b"abc")
+
+
+def test_stream_pads_a_127_byte_frame_so_it_is_not_taken_for_stop():
+    b = sim.SimWifiBadge()
+    s = wifi.WifiSession(lambda n: wifi.SimChannel(b, n), pace=False)
+    f127 = b"\xff\xd8" + b"\x00" * 123 + b"\xff\xd9"
+    assert len(f127) == 127
+    assert run(s.stream([f127, f127], fps=100)) == 2
+    assert len(b.frames) == 2 and all(len(f) == wifi.MIN_JPEG for f in b.frames)

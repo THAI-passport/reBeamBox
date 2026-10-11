@@ -6,7 +6,7 @@ Rules: write down every command you run and its output. A failure with a log is 
 
 ## 0. Before you start (10 min)
 - Charge the badge above 50 percent. Know the model (NIKKO/Pulse, NANO, NIJI), firmware version shown in the vendor app if you have it, and the exact product name on the box.
-- Computer: Python env from README, `pip install -e .[dev]`, Bluetooth adapter on, `python -m pytest -q tests` green.
+- Computer: Python env from README, `pip install -e .[test]`, Bluetooth adapter on, `python -m pytest -q tests` green.
 - Phone with the vendor app (only for the reference capture in step 1). Enable Developer options, "Enable Bluetooth HCI snoop log" (Android), then toggle Bluetooth off and on.
 - Optional: nRF Connect for Mobile (Nordic) on a phone, a second laptop or a Wi-Fi capable computer for the access point capture.
 

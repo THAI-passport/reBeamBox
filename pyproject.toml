@@ -10,7 +10,10 @@ requires-python = ">=3.10"
 dependencies = ["bleak>=0.22", "Pillow>=10.1"]
 
 [project.optional-dependencies]
-dev = ["pytest", "pytest-asyncio", "unicorn", "pyelftools", "capstone"]
+test = ["pytest"]
+emulation = ["unicorn", "capstone", "pyelftools"]
+dev = ["rebeambox[test]"]                      # alias kept so "pip install -e .[dev]" still works; emulation is opt-in
+full = ["rebeambox[test,emulation]"]
 
 [project.scripts]
 rebeambox = "rebeambox.cli:main"

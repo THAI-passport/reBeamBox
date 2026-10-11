@@ -6,12 +6,14 @@ Sends JPG/PNG stills, GIFs, short videos (3 s default cap) and rendered text or 
 STATUS: written from static analysis of the Android app. It has NOT been tested on real hardware. Byte layouts are documented and unit-tested against a software badge, but expect to debug on first contact (see docs/PROTOCOL.md section 6.4). Use `--dry-run` first.
 
 ## Install
-Python 3.10+ is required. ffmpeg is needed only for GIF and video (stills and text do not need it).
+Python 3.10+ is required. Dependencies are split: core (bleak, Pillow) with `pip install -e .`, `[test]` adds pytest, `[emulation]` adds unicorn, capstone and pyelftools (needed only to re-derive auth test vectors from the native library; those tests skip when the extra or the library is missing). ffmpeg is needed only for GIF and video (stills and text do not need it).
 ```
 python3 -m venv .venv
 . .venv/bin/activate            # Windows: .venv\Scripts\activate
 pip install -e .                # installs bleak and Pillow, plus the `rebeambox` command
-pip install -e .[dev]           # adds pytest etc.
+pip install -e .[test]          # adds pytest (core + test is all CI needs)
+pip install -e .[emulation]      # optional: unicorn, capstone, pyelftools for the native-auth emulation and RE tools
+# pip install -e .[dev] still works (alias of [test]); [full] = test + emulation
 # ffmpeg: apt install ffmpeg | brew install ffmpeg | winget install ffmpeg
 ```
 

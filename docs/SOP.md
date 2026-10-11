@@ -169,6 +169,9 @@ Once a parser exists, give it regression data before real captures arrive: gener
 3. When a transport has no live mode, say so in code and in the benchmark: the BLE sink sends clips, goes through the write guard, and its numbers are labelled a slideshow.
 4. Benchmarks are a script that regenerates a document (`tools/bench_stream.py --write`), so the document never drifts from the code.
 
+## 13.4 Dependency split
+Keep the runtime small and make heavy or native-build packages opt-in: core dependencies in `dependencies`, `[test]` for the test runner, `[emulation]` for packages that need wheels or compilers (unicorn, capstone, pyelftools), `[dev]` kept as an alias so old commands work, `[full]` for both. Every test that needs an optional package or a native artifact must `importorskip` it and skip with a reason. Prove the split by building a fresh venv with only core + test and running the whole suite (skips allowed), then repeat with everything; the setup script defaults to the small set and reports, never fails on, a failed emulation install. CI installs the small set.
+
 ## 14. Reporting checklist
 - Update docs/problem_solution.md with any new problem
 - Tools and versions

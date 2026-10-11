@@ -105,6 +105,9 @@ Layering: pure byte builders and parsers first, then media, then async sessions 
 - Native pass 3 (binaries.md): no badge limits in libjl_* or the FFmpeg kit (n6.0 with mjpeg and avi present); the Jieli SDK carries RCSP storage commands (browse 12 and 13, delete 31 and 35, format 34, read 36) that the app never calls, payloads Unknown (PROTOCOL.md 3.7.2).
 - Web recon (`docs/recon-web.md`, labels C, I, W): FCC ID is `2BR3T-BAGDE0` (the BADGE0 spelling is a 404), Bluetooth 2402 to 2480 MHz only, JieLi BR28 (AC701N) with 16 MiB NOR and a FAT16 gallery, panel facts, stock-firmware descriptions of the F1 frame and 0xAE00 versus 0x01F0 attribute tables, a Niji report that 496-byte frames work, related open-source clients (E87/L8 family, different protocol line). Pulse versus Nikko panel size remains unresolved.
 
+### 6.4 Dependency split (2026-10-11)
+`pip install -e .` = core (bleak, Pillow); `.[test]` = + pytest; `.[emulation]` = unicorn, capstone, pyelftools (native-auth emulation only); `.[dev]` is an alias of `.[test]`; `.[full]` = both. `scripts/setup-tools.sh` installs core + test by default and the emulation extras only with `--full` or `--emulation` (a failed native build is reported, not fatal). CI installs `.[test]`. Measured: fresh venv with core + test only gives 303 passed, 2 skipped (auth fuzz needs unicorn; Thai font absent on that box), 1 deselected; full env gives 304 passed, 1 skipped (Thai font), 1 deselected.
+
 ### 6.2 Fixtures, aggregation, lint, CI (new)
 - `tools/make_fixtures.py [--check]` writes `fixtures/captures/{nn20_animation_ack,rcsp_auth_session,malformed}.{btsnoop,pcapng}` plus `MANIFEST.md` (sha256 per file). All SYNTHETIC: built from this repository's builders and a fixed JPEG, with fragmented ACL packets; no vendor data, no hardware. `nn20_animation_ack` = discovery, status push, settings frame, 3-frame 368x368 animation in 88-byte packets with GetPacketSuccess replies; `rcsp_auth_session` = reset, 00|R, 01|E1(R), 02 pass, 00|Rdev, 01|E1(Rdev), 02 pass, GetTargetInfo; `malformed` = nn20 bad checksum (packet 2) and dropped packet (5), RCSP chunks with bad CRC16 (chunk 1) and a dropped sequence number (chunk 3). `tools/replay_pcap.py` now also validates the auth exchange against E1 and reports `warnings` (bad checksums, sequence gaps, incomplete transfers, CRC16 errors) without failing.
 - `tools/aggregate_reports.py [--dir D] [--out F]` turns `reports/first-contact-*.md` into the table in `docs/compatibility-matrix.md` (columns: date, model, device name, masked address, transport, MTU, accepted container Type 5 or 6, verdict, report). Idempotent, deterministic, preserves text outside its marker block; empty state shows a placeholder row. The accepted-container column reads a line `accepted container: type 5|6` that the tester adds after H2; otherwise `not tested`.
@@ -165,7 +168,7 @@ pyproject.toml        package metadata, pytest options (slow marker deselected b
 ```
 git clone https://github.com/THAI-passport/reBeamBox.git && cd reBeamBox
 python3 -m venv .venv && . .venv/bin/activate        # Windows: .venv\Scripts\activate
-pip install -e .[dev]                                # bleak, Pillow, pytest, unicorn, pyelftools, capstone
+pip install -e .[test]                               # core (bleak, Pillow) + pytest; [emulation] adds unicorn, capstone, pyelftools; [full] = both; [dev] = alias of [test]
 # ffmpeg only for GIF/video: apt install ffmpeg | brew install ffmpeg | winget install ffmpeg
 python -m pytest -q                                  # whole suite, no hardware
 python -m pytest -q -m slow tests/test_sw_auth_fuzz.py   # larger auth fuzz

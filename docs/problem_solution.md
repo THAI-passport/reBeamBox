@@ -396,3 +396,11 @@ Entry format: date, phase, problem, cause, solution (or Status: Unsolved plus wh
 - Problem: A BLE "stream" is a series of uploads, each a flash write; at the safe-write default only one clip per 30 s passes.
 - Cause: nn20 and BadgeSdk have no live mode; the Wi-Fi camera mode is the only live path in the app.
 - Solution: The BLE sink is explicitly a clip sink, shares the safe-write gate, counts policy drops, and the benchmark labels it a slideshow.
+
+
+## 56. Optional native packages in the default install
+- Date: 2026-10-11
+- Phase: dependencies
+- Problem: `.[dev]` pulled unicorn, capstone and pyelftools, which need wheels or a compiler and are used by only one test file and the RE tools; setup-tools.sh installed pytest without the package metadata.
+- Cause: all extras were lumped together.
+- Solution: extras split into test, emulation, full, with dev as an alias of test; setup script gained `--full`/`--emulation` and tolerates a failed emulation install; CI installs `.[test]`; `pytest-asyncio` was dropped because no test uses it. Verified in fresh venvs: core+test 303 passed, 2 skipped; full 304 passed, 1 skipped.

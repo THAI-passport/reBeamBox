@@ -113,7 +113,7 @@ def _read_ci():
 def test_ci_workflow_has_required_steps():
     text = _read_ci()
     for needle in ('branches: [main]', "pull_request:", 'python-version: ["3.10", "3.11", "3.12"]', "actions/setup-node",
-                   'pip install -e ".[dev]"', "pytest -q", "tests/test_no_vendor_calls.py", "tools/check_repo_rules.py",
+                   'pip install -e ".[test]"', "pytest -q", "tests/test_no_vendor_calls.py", "tools/check_repo_rules.py",
                    "tools/make_fixtures.py --check"):
         assert needle in text, needle
     try:

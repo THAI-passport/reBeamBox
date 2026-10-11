@@ -73,7 +73,6 @@ Show a live feed (screen, camera, canvas or video) from the phone on the 360x360
 | Flash wear from continuous rewrite | Shortened badge life | Overwrite a single file, limit session length, warn the user |
 | Stock firmware cannot stream at all | No live mode | Slideshow mode with background upload; Wi-Fi if available; custom firmware only with a recovery path |
 | Device-name path ambiguity | Wrong protocol on a given unit | Detect by services after connect (0x01F0 versus C2E6FD00) instead of by name |
-| Legal and warranty | Interoperability use only | Keep the repo free of app code and assets; document only the protocol |
 
 ## Fallbacks if the stock firmware cannot stream
 1. Rapid still updates (1 to 2 fps) with small JPEGs.

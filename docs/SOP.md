@@ -172,6 +172,14 @@ Once a parser exists, give it regression data before real captures arrive: gener
 ## 13.4 Dependency split
 Keep the runtime small and make heavy or native-build packages opt-in: core dependencies in `dependencies`, `[test]` for the test runner, `[emulation]` for packages that need wheels or compilers (unicorn, capstone, pyelftools), `[dev]` kept as an alias so old commands work, `[full]` for both. Every test that needs an optional package or a native artifact must `importorskip` it and skip with a reason. Prove the split by building a fresh venv with only core + test and running the whole suite (skips allowed), then repeat with everything; the setup script defaults to the small set and reports, never fails on, a failed emulation install. CI installs the small set.
 
+## 13.5 Keeping docs consistent
+
+- Do not write test counts in prose; say run `pytest -q` or point at CI.
+- Values that sources disagree on (screen size, picture size, chip, limits) live only in `docs/FACTS.md`; other docs link to it.
+- Checking docs against code finds real bugs (here: `--model` overrode the badge-reported size).
+- CI lives in `.github/workflows/ci.yml`; a token needs the `workflow` scope to push it.
+- Safe-write has a hard daily cap (50 per badge per 24 h) besides warnings.
+
 ## 14. Reporting checklist
 - Update docs/problem_solution.md with any new problem
 - Tools and versions

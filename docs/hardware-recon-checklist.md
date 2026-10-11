@@ -48,7 +48,6 @@ This checklist defines the empirical verification process for physical Beambox e
 
 - **Lithium Battery Warning:** The badge contains a pouch LiPo cell directly behind the electronics. Never use metal tweezers, scalpels, or excessive heat near the pouch. Disconnect or desolder the positive battery lead immediately upon opening the casing.
 - **Voltage Rail Safety:** Wearable NOR flash commonly runs on 1.8V logic. Never attach a 3.3V/5V programmer without first measuring the flash chip's VCC with a multimeter while the device is on.
-- **Firmware Dump Policy:** Binary dumps contain vendor copyright assets. Compute cryptographic hashes (SHA-256) and store dumps locally; never commit binary blobs to the public repository.
 
 ## 3. Non-Destructive Software Probes (Phase 1)
 

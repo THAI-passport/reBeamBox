@@ -7,3 +7,5 @@ analysis/work/
 analysis/jadx.log
 analysis/jadx.done
 *.egg-info/
+reports/*
+!reports/README.md

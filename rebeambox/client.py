@@ -58,7 +58,7 @@ def detect_transport(link):
 
 
 async def send(link, job, transport=None, size_override=None, log=print, progress=None,
-               fast=False, animation_type=1):
+               fast=False, animation_type=1, packet_interval_ms=20, ack_batch_size=4):
     """Send a Job over a connected Link. Returns the exact payload file bytes that were transferred."""
     transport = transport or detect_transport(link)
     log("transport: %s" % transport)
@@ -70,7 +70,8 @@ async def send(link, job, transport=None, size_override=None, log=print, progres
         data, is_avi, name = job.badge_payload(size)
         await s.send_media(data, is_avi, name, progress)
         return data
-    s = Nn20Session(link, log, guard_scale=0.0 if fast else 1.0, interval=0.0 if fast else 0.05)
+    s = Nn20Session(link, log, guard_scale=0.0 if fast else 1.0, interval=0.0 if fast else packet_interval_ms / 1000.0,
+                    ack_batch=ack_batch_size)
     await s.start()
     reported = None
     try:

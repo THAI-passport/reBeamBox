@@ -23,6 +23,17 @@ class Link:
     async def close(self):
         pass
 
+    async def reconnect(self):
+        raise NotImplementedError("this link cannot reconnect")
+
+    def service_uuids(self):
+        """Lower-case UUIDs of the services found on the device."""
+        raise NotImplementedError
+
+    def describe(self):
+        """List of {"service": uuid, "characteristics": [{"uuid", "properties", ...}]} for reports."""
+        return [{"service": u, "characteristics": []} for u in self.service_uuids()]
+
 
 class BleakLink(Link):
     """Real Bluetooth link using bleak."""
@@ -44,6 +55,27 @@ class BleakLink(Link):
 
     def has_service(self, uuid):
         return any(s.uuid.lower() == uuid.lower() for s in self._client.services)
+
+    def service_uuids(self):
+        return [s.uuid.lower() for s in self._client.services]
+
+    async def reconnect(self):
+        try:
+            await self._client.disconnect()
+        except Exception:
+            pass
+        await self.connect()
+
+    def describe(self):
+        out = []
+        for svc in self._client.services:
+            out.append({"service": str(svc.uuid), "characteristics": [
+                {"uuid": str(c.uuid), "properties": list(c.properties), "handle": c.handle,
+                 "descriptors": [str(d.uuid) for d in c.descriptors]} for c in svc.characteristics]})
+        return out
+
+    async def read(self, uuid):
+        return bytes(await self._client.read_gatt_char(uuid))
 
     async def write(self, uuid, data, response=False):
         await self._client.write_gatt_char(uuid, data, response=response)
@@ -67,6 +99,11 @@ class RecordingLink(Link):
 
     def has_service(self, uuid):
         return self.badge.has_service(uuid)
+
+    def service_uuids(self):
+        from . import control, nn20
+        from .session import AE00
+        return [u for u in (control.SERVICE, AE00, nn20.SERVICE) if self.badge.has_service(u)]
 
     async def write(self, uuid, data, response=False):
         self.events.append(("W", short(uuid), bytes(data)))

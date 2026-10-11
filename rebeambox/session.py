@@ -274,11 +274,20 @@ class BadgeSession:
 
 
 class Nn20Session:
-    """nn20 path: service 0x01F0."""
+    """nn20 path: service 0x01F0.
 
-    def __init__(self, link, log=lambda *_: None, guard_scale=1.0, interval=0.05):
+    Packet size comes from the negotiated MTU (P = min(446, mtu - 12), ATT minimum 23). `interval` is the gap in
+    seconds between packets, `ack_batch` the largest ACK batch. When the badge reports time_mode 1 the stream is sent
+    without per-batch ACKs; on a GetPacketFail or a write error (drop or disconnect) the session falls back to ACK
+    batches and restarts the transfer from the first packet (the first packet of a stream starts a new upload)."""
+
+    def __init__(self, link, log=lambda *_: None, guard_scale=1.0, interval=0.02, ack_batch=4):
+        if interval < 0 or ack_batch < 1:
+            raise ValueError("interval must be >= 0 and ack_batch >= 1")
         self.link, self.log, self.guard_scale, self.interval = link, log, guard_scale, interval
+        self.ack_batch = ack_batch
         self.status = {}
+        self.modes = []             # trace of the modes used, for logs and tests
         self._buf = b""
         self._acks = asyncio.Queue()
 
@@ -299,6 +308,7 @@ class Nn20Session:
     async def start(self):
         await self.link.subscribe(nn20.NOTIFY, self._on_notify)
         await asyncio.sleep(0.05)
+        self.log("MTU %d, %d data bytes per packet" % (self.link.mtu, nn20.data_per_packet(self.link.mtu)))
 
     async def _wr(self, f):
         await self.link.write(nn20.WRITE, f, response=False)
@@ -313,45 +323,91 @@ class Nn20Session:
         frames = nn20.build_frames(type_, payload, self.link.mtu)
         n = len(frames)
         if int(self.status.get("time_mode", 0)) == 1:
-            for i, f in enumerate(frames):
-                await self._wr(f)
-                await asyncio.sleep(0.02)
-                if progress:
-                    progress(100 * (i + 1) // n)
+            self.modes.append("noack")
+            if not await self._send_noack(frames, progress):
+                self.log("drop or disconnect in no-ACK mode: falling back to ACK batches of up to %d" % self.ack_batch)
+                self.modes.append("ack")
+                await self._send_acked(frames, progress)
         else:
+            self.modes.append("ack")
             await self._send_acked(frames, progress)
         await asyncio.sleep(nn20.guard_time_ms(n) / 1000 * self.guard_scale)
 
+    def _saw_fail(self):
+        failed = False
+        while not self._acks.empty():
+            if self._acks.get_nowait() == "fail":
+                failed = True
+        return failed
+
+    async def _recover(self, err):
+        try:
+            await self.link.reconnect()
+        except NotImplementedError:
+            raise ProtocolError("link lost (%s) and cannot reconnect" % err)
+        self._buf = b""
+        await self.start()
+
+    async def _send_noack(self, frames, progress):
+        """Returns True when every packet was written without a reported drop."""
+        n = len(frames)
+        for i, f in enumerate(frames):
+            try:
+                await self._wr(f)
+            except Exception as e:
+                self.log("write failed at packet %d: %s" % (i, e))
+                await self._recover(e)
+                return False
+            await asyncio.sleep(self.interval)
+            await asyncio.sleep(0)
+            if self._saw_fail():
+                return False
+            if progress:
+                progress(100 * (i + 1) // n)
+        return True
+
     async def _send_acked(self, frames, progress):
-        n, i, batch, retries = len(frames), 0, 4, 0
+        n, i, batch, retries = len(frames), 0, self.ack_batch, 0
         while i < n:
             part = frames[i:i + batch]
             while not self._acks.empty():
                 self._acks.get_nowait()
             for f in part:
-                await self._wr(f)
-                await asyncio.sleep(self.interval)
-            good = 0
-            failed = False
-            for _ in part:
                 try:
-                    r = await asyncio.wait_for(self._acks.get(), self.interval * len(part) + 2.5)
-                except asyncio.TimeoutError:
-                    failed = True
+                    await self._wr(f)
+                except Exception as e:
+                    self.log("write failed at packet %d: %s" % (i, e))
+                    retries += 1
+                    if retries > 3:
+                        raise ProtocolError("link lost while sending packet %d" % i)
+                    await self._recover(e)
+                    i = 0           # the badge lost its place: start the stream again
                     break
-                if r == "ok":
-                    good += 1
-                else:
-                    failed = True
-                    break
-            i += good
-            if failed:
-                retries += 1
-                if retries > 3:
-                    raise ProtocolError("badge did not acknowledge packet %d" % i)
-                batch = 1
-                await asyncio.sleep(min(0.5 * 2 ** (retries - 1), 2.0))
-            elif batch < 4:
-                batch = min(4, batch * 2)
-            if progress:
-                progress(100 * i // n)
+                await asyncio.sleep(self.interval)
+            else:
+                good = 0
+                failed = False
+                for _ in part:
+                    try:
+                        r = await asyncio.wait_for(self._acks.get(), self.interval * len(part) + 2.5)
+                    except asyncio.TimeoutError:
+                        failed = True
+                        break
+                    if r == "ok":
+                        good += 1
+                    else:
+                        failed = True
+                        break
+                i += good
+                if failed:
+                    retries += 1
+                    if retries > 3:
+                        raise ProtocolError("badge did not acknowledge packet %d" % i)
+                    batch = 1
+                    await asyncio.sleep(min(0.5 * 2 ** (retries - 1), 2.0))
+                elif batch < self.ack_batch:
+                    batch = min(self.ack_batch, batch * 2)
+                if progress:
+                    progress(100 * i // n)
+                continue
+            batch = 1               # after a reconnect resend the same packets one at a time

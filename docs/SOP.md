@@ -151,6 +151,9 @@ Procedure that worked, reusable for any secondary transport:
 ## 13. Phase: tests
 `.venv/bin/python -m pytest tests -q` (software test plan: docs/software-test-v1.md; hardware plan: docs/hardware-test-v1.md; earlier count 64 tests, no hardware, ffmpeg tests skip if ffmpeg is missing). Coverage: frame serialization and checksums (control, nn20, rcsp), auth vectors frozen from the native library emulation, container layouts, media conversion and the 3 s cap, session flows against the simulators (still, animation, no packet CRC, retry after a failed packet, free-space refusal, memory refusal), CLI dry run output, and the no-vendor-calls check. Pitfall: a test GIF made of near-identical frames is merged by Pillow on save; make frames visibly different.
 
+## 13.1 First-contact tooling (before the first real badge)
+Build tooling that makes the first hardware session cheap and loss-free: (1) a read-only qualification command that records advertisement, MTU, GATT, transport decision and the first reply into a report shaped like the results template (`probe --qualify`; test it against the software badges with `--simulate`); (2) pacing and packet size as flags derived from the negotiated MTU, with an automatic fallback so a first run does not stall; (3) an offline replay tool for a capture of the vendor app (`tools/replay_pcap.py`) so the reference traffic can be decoded with the same parsers as the client, which turns every capture into a regression test; (4) a dependency-free browser harness (`ui/`) as a second implementation, cross-checked byte for byte against the Python one in a test (Node, skipped if missing). Pitfalls: synthetic captures must include fragmented ACL packets and PDUs without discovery; do not require valid checksums when classifying, or corrupted frames disappear.
+
 ## 14. Reporting checklist
 - Update docs/problem_solution.md with any new problem
 - Tools and versions

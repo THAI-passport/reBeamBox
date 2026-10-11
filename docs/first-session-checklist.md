@@ -30,6 +30,7 @@ Then dump the GATT table of the badge (also do it in nRF Connect and use its Exp
 ```
 rebeambox probe <ADDRESS> --json gatt-<model>.json
 ```
+Shortcut: `rebeambox probe --qualify --model <model>` does the scan, MTU, GATT, transport decision and a read-only handshake in one go and writes `reports/first-contact-<timestamp>.md` in the results template layout (attach it to the issue). To decode the vendor-app reference capture afterwards: `python tools/replay_pcap.py btsnoop_hci.log --out extracted/`. Software tests: docs/software-test-v1.md; hardware plan: docs/hardware-test-v1.md.
 Decide the transport from the services:
 - Service `000001F0-...` (0x01F0) with characteristics 0x01F1/0x01F2: nn20 path.
 - A custom 0x9E control service plus Jieli RCSP (UUIDs in PROTOCOL.md 2 and 3.7): BadgeSdk path.

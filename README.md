@@ -58,9 +58,22 @@ rebeambox send-text "Hi" --dry-run t.txt --pic 240 240
 ## How it works
 Transport is chosen by service discovery: control service C2E6FD00 plus Jieli 0xAE00 (BadgeSdk path: bind, picture size, Jieli auth, RCSP large-file transfer), or service 0x01F0 (nn20 path: IMB still or animation container in framed packets with ACK pacing). See docs/PROTOCOL.md.
 
+## First contact, pacing, web harness, capture replay
+```
+rebeambox probe --qualify --model nikko          # scan, MTU, GATT, transport, read-only handshake; writes reports/first-contact-<timestamp>.md
+rebeambox probe --qualify --simulate nn20        # same against a software badge (no Bluetooth)
+rebeambox send-image photo.jpg --packet-interval-ms 20 --ack-batch-size 4 --nn20-still gif
+python tools/replay_pcap.py btsnoop_hci.log --out extracted/     # decode a capture of the vendor app (also .pcap, .pcapng)
+cd ui && python3 -m http.server 8000                             # Web Bluetooth harness, open http://localhost:8000 in Chrome
+```
+- `probe --qualify` writes nothing to the badge storage: nn20 badges are only listened to (status JSON on 0x01F2), BadgeSdk badges get the read-only info query 0xC6. The report follows the results template of docs/hardware-test-v1.md; Bluetooth addresses are masked unless `--no-redact`. Reports are git-ignored.
+- Packet size follows the negotiated MTU: P = min(446, mtu - 12), ATT minimum 23. No-ACK streaming falls back to ACK batches (and a reconnect if the link dropped) when the badge reports a failed packet or a write errors.
+- nn20 stills default to a one-frame type 5 container (interval 3000 ms); `--nn20-still album` sends type 6. Stills are cropped with a circular mask on black at the size the badge reports (360 or 368).
+- Details: ui/README.md, tools/replay_pcap.py header, docs/hardware-test-v1.md.
+
 ## Tests
 ```
-python -m pytest tests -q            # no hardware; see docs/software-test-v1.md (larger auth fuzz: -m slow)
+python -m pytest -q                  # no hardware (202 pass, 1 skip); see docs/software-test-v1.md (larger auth fuzz: -m slow)
 ```
 
 ## Docs

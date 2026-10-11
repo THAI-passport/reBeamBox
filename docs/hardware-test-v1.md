@@ -11,6 +11,7 @@ Needs a real badge. Run after the software tests (software-test-v1.md) and use t
 
 ## H1. Scan, advertised name and services
 - Steps: badge on its pairing screen; `rebeambox scan --all --timeout 15 | tee scan-all.txt`; `rebeambox scan --model <model>`; `rebeambox probe <ADDRESS> --json gatt.json`; compare with nRF Connect.
+- Shortcut: `rebeambox probe --qualify --model <model>` writes `reports/first-contact-<timestamp>.md` with these fields filled in (read-only handshake; PASS means transport identified and the badge answered, PARTIAL means identified but silent, FAIL means not found or no known service).
 - Pass: the badge appears in `scan --model <model>` (names expected `E-badge`, `Nikko-badge(BLE)`, `NEO...`, `B-Device...`); the service list identifies the transport: 0x01F0 (nn20) or the 0x9E control service plus RCSP (BadgeSdk). Record the exact name, service UUIDs, manufacturer data (tag 0xB3 expected for BadgeSdk badges) and MTU.
 - Fail: not found with `--all` (adapter, pairing screen, power); found only without a model filter (add the name to `profiles`); neither service present.
 - Also record: any SSID containing `E-Badge` on the phone Wi-Fi list (decides H5).

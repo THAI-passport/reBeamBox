@@ -21,6 +21,8 @@ def _add_common(p):
                    help="simulated badge picture size for --dry-run")
     p.add_argument("--model", choices=sorted(models.PROFILES), help="badge model: adds its name filter, sets default size, video cap and still encoding")
     p.add_argument("--nn20-still", choices=["gif", "album"], help="nn20 stills: gif = type 5 one-frame container (default), album = type 6 IMB")
+    p.add_argument("--packet-interval-ms", type=float, default=20.0, help="nn20 gap between packets in ms (default 20)")
+    p.add_argument("--ack-batch-size", type=int, default=4, help="nn20 ACK mode: packets per batch (default 4, falls back to 1 after errors)")
     p.add_argument("--quiet", action="store_true")
 
 
@@ -34,7 +36,13 @@ def build_parser():
     s.add_argument("--all", action="store_true", help="show every device")
     s.add_argument("--model", choices=sorted(models.PROFILES))
     p = sub.add_parser("probe", help="connect and dump GATT services (use for the first-session record)")
-    p.add_argument("address"); p.add_argument("--json", help="also write the dump to this file")
+    p.add_argument("address", nargs="?"); p.add_argument("--json", help="also write the dump to this file")
+    p.add_argument("--qualify", action="store_true", help="first-contact qualification: scan, MTU, GATT, transport, read-only handshake, write a report")
+    p.add_argument("--model", choices=sorted(models.PROFILES)); p.add_argument("--name", action="append", default=[])
+    p.add_argument("--timeout", type=float, default=8.0, help="scan seconds")
+    p.add_argument("--report-dir", default="reports"); p.add_argument("--no-redact", action="store_true", help="keep the full Bluetooth address in the report")
+    p.add_argument("--no-wifi-check", action="store_true"); p.add_argument("--wait", type=float, default=3.0, help="seconds to wait for the handshake reply")
+    p.add_argument("--simulate", choices=["nn20", "badge"], help="run against a software badge (no Bluetooth)")
     p = sub.add_parser("send-image", help="send a JPG/PNG still"); p.add_argument("path"); _add_common(p)
     p.add_argument("--quality", type=int, default=90)
     p = sub.add_parser("send-gif", help="send an animated GIF"); p.add_argument("path"); _add_common(p)
@@ -55,6 +63,11 @@ def build_parser():
 def _hex(c):
     c = c.lstrip("#")
     return tuple(int(c[i:i + 2], 16) for i in (0, 2, 4))
+
+
+def check_pacing(args):
+    if getattr(args, "packet_interval_ms", 20) < 0 or getattr(args, "ack_batch_size", 4) < 1:
+        raise ValueError("--packet-interval-ms must be >= 0 and --ack-batch-size >= 1")
 
 
 def apply_model(args):
@@ -139,6 +152,7 @@ async def _run_wifi(args, log):
 
 
 async def _run_send(args):
+    check_pacing(args)
     log = (lambda *_: None) if args.quiet else (lambda m: print(m, file=sys.stderr))
     if args.cmd == "stream" or args.transport == "wifi":
         apply_model(args)
@@ -149,7 +163,8 @@ async def _run_send(args):
         badge = sim.SimNn20() if tr == "nn20" else sim.SimBadgeSdk(picture=tuple(args.pic))
         lk = link.RecordingLink(badge)
         payload = await client.send(lk, job, tr,
-                                    args.size, log, fast=True)
+                                    args.size, log, fast=True, packet_interval_ms=args.packet_interval_ms,
+                                    ack_batch_size=args.ack_batch_size)
         with open(args.dry_run, "w") as fh:
             fh.write("# rebeambox dry run: W = written by us, N = simulated badge notification\n")
             fh.write("# columns: direction, short uuid, length, bytes\n")
@@ -171,7 +186,8 @@ async def _run_send(args):
     await lk.connect()
     try:
         await client.send(lk, job, args.transport, args.size, log, progress=None if args.quiet else
-                          (lambda p: print("\r%3d%%" % p, end="", file=sys.stderr)))
+                          (lambda p: print("\r%3d%%" % p, end="", file=sys.stderr)),
+                          packet_interval_ms=args.packet_interval_ms, ack_batch_size=args.ack_batch_size)
         log("\ndone")
     finally:
         await lk.close()
@@ -193,7 +209,17 @@ def main(argv=None):
             if not res:
                 print("no badges found")
             return 0
+        if args.cmd == "probe" and args.qualify:
+            from . import qualify
+            path, res = asyncio.run(qualify.run(args.address, args.name, args.model, args.timeout, args.simulate, args.report_dir,
+                                                args.no_redact, not args.no_wifi_check, args.wait,
+                                                command="rebeambox " + " ".join(sys.argv[1:] if argv is None else argv)))
+            print("%s: transport %s, report %s" % (res["verdict"], res["transport"], path))
+            return 1 if res["verdict"] == "FAIL" else 0
         if args.cmd == "probe":
+            if not args.address:
+                print("error: probe needs an address (or use --qualify)", file=sys.stderr)
+                return 2
             import json
             res = asyncio.run(scanmod.probe(args.address))
             text = json.dumps(res, indent=2)

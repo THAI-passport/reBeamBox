@@ -277,3 +277,32 @@ Entry format: date, phase, problem, cause, solution (or Status: Unsolved plus wh
 - Cause: Followed the app literally; the 30720-byte limit is a likely badge buffer size, so sending more is risky.
 - Solution: `WifiSession.stream` drops frames above 30720 bytes and counts them in `dropped`; documented in wifi-protocol.md and software-test-v1.md.
 
+
+
+## 40. No-ACK fallback needs a restart point the protocol does not give
+- Date: 2026-10-11
+- Phase: first-contact tooling
+- Problem: On a dropped packet in no-ACK mode the badge reply (GetPacketFail) does not say which packet failed, so resuming mid-stream is a guess.
+- Cause: The reply text carries no index (code search, PROTOCOL.md section 8).
+- Solution: Restart the stream from the first packet in ACK mode (also after a reconnect). The software badge treats a first packet as a new upload. Status: Inferred; hardware test H4 must confirm a real badge accepts a restart.
+
+## 41. Silent badge after reconnect in the fallback test
+- Date: 2026-10-11
+- Phase: first-contact tooling
+- Problem: A test with a simulated disconnect hung in ACK mode because the software badge still ran in time_mode 1 and never acknowledged.
+- Cause: Fallback to ACK assumes the badge acknowledges; time_mode 1 may mean it does not.
+- Solution: The test flips the simulated badge to ACK mode on reconnect; the client still raises after 3 unanswered batches instead of hanging. Real behaviour is unknown (H4).
+
+## 42. Capture replay dropped frames with bad checksums
+- Date: 2026-10-11
+- Phase: first-contact tooling
+- Problem: Without GATT discovery in a capture, writes were classified by checksum, so corrupted frames vanished instead of being reported.
+- Cause: Heuristic required a valid checksum.
+- Solution: classify nn20 writes by the consistent length field; checksum failures are counted per transfer. Also fixed the IMB decoder offsets (width and height at byte 16, JPEG length at 24).
+
+## 43. Web Bluetooth cannot read the MTU
+- Date: 2026-10-11
+- Phase: web harness
+- Problem: The browser API exposes no negotiated MTU, so P = min(446, mtu - 12) cannot be computed automatically.
+- Cause: Platform limitation.
+- Solution: MTU is an input (default 247) and is halved on a write error, up to three times. Hardware confirmation pending.

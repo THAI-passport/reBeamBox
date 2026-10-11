@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; img-src 'self' blob: data:; connect-src 'none'">
+<title>reBeamBox Web Bluetooth harness</title>
+<style>
+  body { font: 14px/1.4 system-ui, sans-serif; max-width: 42rem; margin: 1.5rem auto; padding: 0 1rem; color: #111; }
+  h1 { font-size: 1.2rem; }
+  fieldset { margin: 1rem 0; border: 1px solid #bbb; }
+  label { display: inline-block; margin: .2rem .8rem .2rem 0; }
+  input[type=number] { width: 5rem; }
+  button { padding: .4rem .9rem; }
+  canvas { width: 180px; height: 180px; background: #000; border: 1px solid #bbb; }
+  pre { background: #f4f4f4; padding: .5rem; max-height: 12rem; overflow: auto; }
+  svg { vertical-align: -3px; }
+</style>
+</head>
+<body>
+<h1>reBeamBox Web Bluetooth harness (nn20, service 0x01F0)</h1>
+<p>Sends one still image as a one-frame type 5 animation container to a badge that exposes service 0x01F0. Untested on hardware.
+Everything runs in this page; it makes no network requests.</p>
+
+<fieldset><legend>1. Connect</legend>
+  <button id="connect"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7 7 10 10-5 5V2l5 5L7 17"/></svg> Connect</button>
+  <button id="disconnect" disabled>Disconnect</button>
+  <label><input type="checkbox" id="anydev"> list every device (if the filter finds nothing)</label>
+  <pre id="status">(status JSON appears here)</pre>
+</fieldset>
+
+<fieldset><legend>2. Image</legend>
+  <input type="file" id="file" accept="image/*">
+  <label>size <select id="size"><option value="auto">badge reported (else 360)</option><option>360</option><option>368</option></select></label>
+  <label><input type="checkbox" id="square"> no circular mask</label>
+  <div><canvas id="preview" width="360" height="360"></canvas></div>
+</fieldset>
+
+<fieldset><legend>3. Send</legend>
+  <label>ATT MTU <input type="number" id="mtu" value="247" min="23" max="517"></label>
+  <label>packet interval ms <input type="number" id="interval" value="20" min="0"></label>
+  <label>ACK batch <input type="number" id="batch" value="4" min="1"></label>
+  <label>still interval ms <input type="number" id="still" value="3000" min="100"></label>
+  <p>Web Bluetooth does not report the negotiated MTU. Enter 247 or 517 if known; a write error halves it automatically.</p>
+  <button id="send" disabled>Send as type 5</button> <progress id="progress" max="100" value="0"></progress>
+</fieldset>
+
+<pre id="log"></pre>
+<script src="nn20.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

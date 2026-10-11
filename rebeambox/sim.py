@@ -170,8 +170,9 @@ class SimBadgeSdk(SimBadge):
 class SimNn20(SimBadge):
     """nn20 badge: pushes a status record, acknowledges every packet."""
 
-    def __init__(self, time_mode=0, freespace=20000, fail_packets=()):
-        self.time_mode, self.freespace = time_mode, freespace
+    def __init__(self, time_mode=0, freespace=20000, fail_packets=(), noack_fail_at=None, size="368,368"):
+        self.time_mode, self.freespace, self.size = time_mode, freespace, size
+        self.noack_fail_at = noack_fail_at      # in no-ACK mode report a drop at this write number, then ACK
         self.fail = set(fail_packets)
         self.packets = []
         self.n_seen = 0
@@ -181,16 +182,22 @@ class SimNn20(SimBadge):
 
     def on_subscribe(self, uuid):
         st = json.dumps({"freespace": self.freespace, "allspace": 32000, "time_mode": self.time_mode,
-                         "devname": "SIM-NN20", "brand": "sim", "type": 13, "size": "368,368"}, separators=(",", ":"))
+                         "devname": "SIM-NN20", "brand": "sim", "type": 13, "size": self.size}, separators=(",", ":"))
         self.link.push(nn20.NOTIFY, nn20.make_reply(1, st))
 
     def on_write(self, uuid, data):
         if uuid != nn20.WRITE or data[0] != 0xF1 or data[1] == nn20.TYPE_SETTINGS:
             return
         assert nn20.checksum(data[:-1]) == data[-1]
+        n_total, remaining = int.from_bytes(data[2:4], "big"), int.from_bytes(data[4:6], "big")
+        if n_total and remaining == n_total - 1:      # first packet of a stream: a new upload starts
+            self.packets = []
         self.packets.append(data)
         self.n_seen += 1
         if self.time_mode == 1:
+            if self.noack_fail_at is not None and self.n_seen == self.noack_fail_at:
+                self.time_mode = 0
+                self.link.push(nn20.NOTIFY, nn20.make_reply(data[1], '{"msg":"GetPacketFail"}'))
             return
         ok = self.n_seen not in self.fail
         self.link.push(nn20.NOTIFY, nn20.make_reply(data[1], '{"msg":"%s"}' % ("GetPacketSuccess" if ok else "GetPacketFail")))

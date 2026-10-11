@@ -99,8 +99,20 @@ Method used (all greps from analysis/decompiled/sources):
 6. Scan filters: look for ScanFilter, device name matchers and constants for names.
 Findings for this app are in docs/PROTOCOL.md (service 0x01F0, write 0x01F1, notify 0x01F2).
 
+## 11. Phase: trace the upload pipeline
+Method used (what worked):
+1. Start from the UI, not the first UUID hit. Find the click handler that connects (here o7/t6.java) and note how it chooses a transport. This revealed three transports.
+2. Find the send entry points: grep for `.sendPhoto(`, `.sendFile(` and the manager's send method over vendor packages. Read the sender method fully (framing, chunk size, checksum).
+3. Follow the pacing code: Handler.postAtTime and postDelayed calls, retry counters, timeouts, batch sizes. Record constants.
+4. Read the receive path (`onCharacteristicChanged`) for the reply layout and the ACK matching strings.
+5. Read the media builders (BinConverter, BadgeMediaFileBuilder); where jadx fails use `apktool d --no-res` and read the smali strings (it exposed the ffmpeg command line).
+6. For native helpers, extract the .so from the split APK and disassemble with capstone and pyelftools (pip install into the venv). A 72-byte CRC function was enough to identify the algorithm; verify with the check value of "123456789".
+7. Generate worked examples with a small script (scripts/spec_vectors.py) that implements only the documented formulas, and paste its output into docs/PROTOCOL.md.
+8. Tag every statement Confirmed, Inferred or Speculative.
+Outputs: docs/PROTOCOL.md, docs/app-behaviour.md, docs/binaries.md, and docs/hardware-prediction.md and docs/streaming-plan.md for design work.
+
 ## 12. Phase: build the client
-TODO. Planned: Python client with bleak and Pillow, scan and connect, image and GIF conversion to 360x360, chunked writes with flow control, CLI. Icons only (Lucide) in any UI, no emoji.
+TODO (not started). Plan: docs/streaming-plan.md. Planned: Python client with bleak and Pillow, scan and connect, image and GIF conversion to 360x360, chunked writes with flow control, CLI. Icons only (Lucide) in any UI, no emoji.
 
 ## 13. Phase: tests
 TODO. Planned: pytest unit tests for packet serialization, checksum, chunking, and frame conversion; golden vectors derived from the spec; no hardware required.

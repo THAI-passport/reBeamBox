@@ -220,3 +220,17 @@ Entry format: date, phase, problem, cause, solution (or Status: Unsolved plus wh
 - Problem: `rebeambox scan` on the headless box printed "[Errno 2] No such file or directory".
 - Cause: bleak/BlueZ D-Bus socket missing.
 - Solution: CLI now prints a hint about a missing adapter or BlueZ. Status: Solved.
+
+## 32. Earlier transport assumption contradicted by hardware reports
+- Date: 2026-10-11
+- Phase: Models
+- Problem: Earlier docs and the client treated the BadgeSdk/Jieli RCSP path as the likely one for Beambox badges and still images as type 6 with an IMB header.
+- Cause: Static analysis cannot show which service a given model exposes; server product list decides.
+- Solution: Third-party reports on a Niji and a Nano show only service 0x01F0 and a black screen for type 6. Client now defaults still images to a one-frame type 5 container, accepts the name E-badge, and docs/PROTOCOL.md section 7 records the correction. Status: Solved in code, unverified by us on hardware.
+
+## 33. Model names barely appear in the code
+- Date: 2026-10-11
+- Phase: Models
+- Problem: Asked for per-model code paths in m2/g.java, a0/j.java and wg/*; those files hold no model names (wg does not exist in the jadx output).
+- Cause: Product identity is server data; code keeps only placeholders and one NIJI comparison.
+- Solution: Full-tree case-insensitive grep, then traced the stored keys; documented in docs/models.md. Status: Solved (negative result).

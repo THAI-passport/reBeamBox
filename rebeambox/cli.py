@@ -3,7 +3,7 @@ import argparse
 import asyncio
 import sys
 
-from . import __version__, client, link, media, scan as scanmod, sim
+from . import __version__, client, link, media, models, scan as scanmod, sim
 
 
 def _add_common(p):
@@ -16,6 +16,8 @@ def _add_common(p):
     p.add_argument("--dry-run", metavar="FILE", help="no Bluetooth: write every frame to FILE (and FILE.payload)")
     p.add_argument("--pic", type=int, nargs=2, metavar=("W", "H"), default=(360, 360),
                    help="simulated badge picture size for --dry-run")
+    p.add_argument("--model", choices=sorted(models.PROFILES), help="badge model: adds its name filter, sets default size, video cap and still encoding")
+    p.add_argument("--nn20-still", choices=["gif", "album"], help="nn20 stills: gif = type 5 one-frame container (default), album = type 6 IMB")
     p.add_argument("--quiet", action="store_true")
 
 
@@ -27,12 +29,13 @@ def build_parser():
     s.add_argument("--name", action="append", default=[])
     s.add_argument("--timeout", type=float, default=8.0)
     s.add_argument("--all", action="store_true", help="show every device")
+    s.add_argument("--model", choices=sorted(models.PROFILES))
     p = sub.add_parser("send-image", help="send a JPG/PNG still"); p.add_argument("path"); _add_common(p)
     p.add_argument("--quality", type=int, default=90)
     p = sub.add_parser("send-gif", help="send an animated GIF"); p.add_argument("path"); _add_common(p)
-    p.add_argument("--max-seconds", type=float, default=media.MAX_SECONDS)
+    p.add_argument("--max-seconds", type=float, default=None, help="cap in seconds (default 3, or the --model profile)")
     p = sub.add_parser("send-video", help="send a video (first 3 s)"); p.add_argument("path"); _add_common(p)
-    p.add_argument("--max-seconds", type=float, default=media.MAX_SECONDS)
+    p.add_argument("--max-seconds", type=float, default=None, help="cap in seconds (default 3, or the --model profile)")
     p.add_argument("--fps", type=int, default=15)
     p = sub.add_parser("send-text", help="render text or a name tag and send it"); p.add_argument("text"); _add_common(p)
     p.add_argument("--subtitle"); p.add_argument("--fg", default="#ffffff"); p.add_argument("--bg", default="#000000")
@@ -46,21 +49,35 @@ def _hex(c):
     return tuple(int(c[i:i + 2], 16) for i in (0, 2, 4))
 
 
+def apply_model(args):
+    """Fill defaults from the --model profile; explicit flags win. Returns the profile or None."""
+    prof = models.get(getattr(args, "model", None))
+    if prof:
+        args.name = list(args.name) + list(prof.names)
+        if args.size is None:
+            args.size = prof.size
+    if hasattr(args, "max_seconds") and args.max_seconds is None:
+        args.max_seconds = prof.video_max_s if prof else media.MAX_SECONDS
+    args.still_mode = args.nn20_still or (prof.still_mode if prof else "gif")
+    return prof
+
+
 def make_job(args):
     circ = not args.square
+    apply_model(args)
     if args.cmd == "send-image":
         from PIL import Image
         def fn(size):
             with Image.open(args.path) as im:
                 return [media.fit_square(im, size, circ)], 0
-        return client.Job("still", fn, quality=args.quality)
+        return client.Job("still", fn, quality=args.quality, still_mode=args.still_mode)
     if args.cmd == "send-text":
         def fn(size):
             im = media.render_text(args.text, args.subtitle, size, _hex(args.fg), _hex(args.bg), args.font, circ)
             if args.save_preview:
                 im.save(args.save_preview)
             return [im], 0
-        return client.Job("still", fn, name="text.jpg")
+        return client.Job("still", fn, name="text.jpg", still_mode=args.still_mode)
     if args.cmd == "send-gif":
         return client.Job("anim", lambda size: media.load_gif_frames(args.path, size, circ, args.max_seconds), name="anim.avi")
     return client.Job("anim", lambda size: _video(args, size, circ), name="video.avi")
@@ -75,9 +92,10 @@ async def _run_send(args):
     log = (lambda *_: None) if args.quiet else (lambda m: print(m, file=sys.stderr))
     job = make_job(args)
     if args.dry_run:
-        badge = sim.SimNn20() if args.transport == "nn20" else sim.SimBadgeSdk(picture=tuple(args.pic))
+        tr = args.transport or ("nn20" if args.model else "badge")
+        badge = sim.SimNn20() if tr == "nn20" else sim.SimBadgeSdk(picture=tuple(args.pic))
         lk = link.RecordingLink(badge)
-        payload = await client.send(lk, job, args.transport or ("nn20" if args.transport == "nn20" else "badge"),
+        payload = await client.send(lk, job, tr,
                                     args.size, log, fast=True)
         with open(args.dry_run, "w") as fh:
             fh.write("# rebeambox dry run: W = written by us, N = simulated badge notification\n")
@@ -111,6 +129,8 @@ def main(argv=None):
     args = build_parser().parse_args(argv)
     try:
         if args.cmd == "scan":
+            if args.model:
+                args.name = list(args.name) + list(models.get(args.model).names)
             res = asyncio.run(scanmod.scan(args.timeout, args.name, args.all))
             for d in res:
                 a = d["adv"]

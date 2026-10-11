@@ -348,3 +348,14 @@ The app only ever builds two kinds of frames on 0x01F1: type 13 settings JSON an
 4. Whether the ACK/pacing rules (nn20) are enforced or only used for reliability.
 5. Behaviour and limits for streaming (see docs/hardware-prediction.md and docs/streaming-plan.md).
 6. Bind reply offsets for protocol >= 26 are read from decompiled code in which jadx merged branches; a real reply would confirm them.
+
+
+## 7. Third-party hardware evidence and corrections (2026-10)
+Reports on real Niji and Nano units (details and links in docs/models.md). Tag [W] = reported by others, not verified by us.
+- [W] Transport: NN-family units expose only service 0x01F0 (01F1 write without response, 01F2 notify). No 0xAE00 and no C2E6FD00 were seen. So nn20 is the primary transport for NIKKO, NANO and NIJI [I for Nikko]. The BadgeSdk/RCSP sections of this document describe the app's other path and remain unverified on hardware.
+- [W] Advertising: only while the pairing screen is shown; name `E-badge`. A Nano on USB power was seen as `Nikko-badge(BLE)` (the app hides names containing BLE).
+- [W] Status JSON is pushed periodically on 01F2 with type 13: `allspace`, `freespace` (KB), `devname`, `size` as the string "368,368", `time_mode`, `brand`. Replies carry `GetPacketSuccess`. This supports the "pushed, not requested" conclusion of 6.2 and the A0 reply layout.
+- [W] Frame layout, big-endian counters and two's-complement checksum match section 2 exactly. 496 data bytes per packet worked (app constant 446).
+- CORRECTION [W]: a still sent as type 6 with a raw JPEG is stored (free space drops) but shows black. A still sent as type 5 with the 0x12345678 container (one frame, interval 3000 ms, 368x368 JPEG) displays correctly. The IMB type 6 path of section 2.7 was not tested by that reporter (they sent a raw JPEG), so type 6 with IMB remains [I]. The client defaults to type 5 and offers `--nn20-still album`.
+- [W] The container, directory entry (12-byte name plus u32 offset) and 32-byte frame header in a Nano's flash match section 2.7. Header size field 360, JPEG data 368.
+- [C] Model-specific code: only the NIJI video window (5 s versus 10 s). See docs/models.md section 4.

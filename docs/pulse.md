@@ -1,4 +1,7 @@
-# Beambox e-Badge Pulse: what the decompiled app says
+# Beambox e-Badge Pulse (= NIKKO): what the decompiled app says
+
+Update: the product owner identifies Pulse as the NIKKO model of the NN family (flagship, standard display, four wearing styles). See docs/models.md for the model comparison, transport per model and third-party hardware reports. Statements below that say the Pulse transport is probably BadgeSdk are superseded: NN-family units reported by third parties use the nn20 service 0x01F0, so the client defaults to nn20 for stills as a one-frame type 5 container.
+
 
 Scope: static reading of Beambox+ 1.0.14 (package com.guangshen.beambox). Tags: [C] confirmed from code, [I] inferred, [U] unknown.
 

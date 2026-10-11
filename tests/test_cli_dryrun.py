@@ -20,8 +20,11 @@ def test_dry_run_text_and_nn20(tmp_path):
     out = tmp_path / "t.txt"
     assert cli.main(["send-text", "Hello", "--subtitle", "Bangkok", "--dry-run", str(out), "--transport", "nn20", "--quiet"]) == 0
     first = [l for l in out.read_text().splitlines() if l.startswith("W 01f1")][0]
-    assert first.split()[3] == "F1" and first.split()[4] == "06"
-    assert (tmp_path / "t.txt.payload").read_bytes()[:4] == b"IMB\x00"
+    assert first.split()[3] == "F1" and first.split()[4] == "05"
+    assert (tmp_path / "t.txt.payload").read_bytes()[:4] == bytes.fromhex("78563412")
+    out2 = tmp_path / "t2.txt"
+    assert cli.main(["send-text", "Hello", "--dry-run", str(out2), "--transport", "nn20", "--nn20-still", "album", "--quiet"]) == 0
+    assert (tmp_path / "t2.txt.payload").read_bytes()[:4] == b"IMB\x00"
 
 def test_dry_run_gif(tmp_path):
     g = tmp_path / "a.gif"

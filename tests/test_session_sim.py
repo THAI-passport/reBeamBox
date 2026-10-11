@@ -44,6 +44,14 @@ def test_badge_too_big_for_memory():
 def test_nn20_still_and_stream_integrity():
     b = sim.SimNn20(); l = link.RecordingLink(b)
     payload = run(client.send(l, job(), fast=True, log=lambda *_: None))
+    assert b.stream() == b'{"type":5,"data":' + payload + b"}"
+    assert int.from_bytes(payload[:4], "little") == 0x12345678 and int.from_bytes(payload[8:12], "little") == 1
+    assert int.from_bytes(payload[12:16], "little") == 3000
+
+def test_nn20_album_mode_uses_imb():
+    b = sim.SimNn20(); l = link.RecordingLink(b)
+    j = job(); j.still_mode = "album"
+    payload = run(client.send(l, j, fast=True, log=lambda *_: None))
     assert b.stream() == b'{"type":6,"data":' + payload + b"}" and payload[:4] == b"IMB\x00"
 
 def test_nn20_noack_mode_and_retry():
@@ -52,7 +60,7 @@ def test_nn20_noack_mode_and_retry():
     assert b.n_seen > 5
     b = sim.SimNn20(fail_packets={3}); l = link.RecordingLink(b)
     payload = run(client.send(l, job(), fast=True, log=lambda *_: None))
-    assert b.n_seen > len(nn20.build_frames(6, payload))     # resent after the failure
+    assert b.n_seen > len(nn20.build_frames(5, payload))     # resent after the failure
 
 def test_nn20_free_space_refusal():
     b = sim.SimNn20(freespace=10); l = link.RecordingLink(b)

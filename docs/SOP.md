@@ -132,8 +132,14 @@ Done (v0.1, untested on hardware). Procedure that worked:
 6. Prove the client has no vendor calls with a test that greps the package for URLs and network modules (tests/test_no_vendor_calls.py), and document any promotional surfaces of the original in docs/ads-removal.md.
 Modules: control (0x9E frames), rcsp and jl_auth (Jieli), nn20 (containers and framing), media (Pillow, ffmpeg using the documented AVI command), scan, link, session, sim, client, cli.
 
+### 12.1 Per-model research
+1. Grep the decompiled tree and resources for each model name (case-insensitive) and list every hit; here only layouts, one string and one trimmer branch matched. Absence of a model table means the product list is server-side.
+2. Trace the stored selection keys (MMKV or SharedPreferences) from where they are written to every place they are read; this exposed the device type switch (BT versus WiFi) and the one NIJI branch.
+3. Do web recon after the code pass: vendor spec pages, FCC filings (grantee, internal photos, chip), teardowns, and hands-on write-ups. Treat them as unverified, label them, and let hardware reports overrule code-only inferences (here: nn20 service only, type 5 container for stills).
+4. Put every model difference into a profile object (models.py) so the CLI option only selects data.
+
 ## 13. Phase: tests
-`.venv/bin/python -m pytest tests -q` (47 tests, no hardware, ffmpeg tests skip if ffmpeg is missing). Coverage: frame serialization and checksums (control, nn20, rcsp), auth vectors frozen from the native library emulation, container layouts, media conversion and the 3 s cap, session flows against the simulators (still, animation, no packet CRC, retry after a failed packet, free-space refusal, memory refusal), CLI dry run output, and the no-vendor-calls check. Pitfall: a test GIF made of near-identical frames is merged by Pillow on save; make frames visibly different.
+`.venv/bin/python -m pytest tests -q` (52 tests, no hardware, ffmpeg tests skip if ffmpeg is missing). Coverage: frame serialization and checksums (control, nn20, rcsp), auth vectors frozen from the native library emulation, container layouts, media conversion and the 3 s cap, session flows against the simulators (still, animation, no packet CRC, retry after a failed packet, free-space refusal, memory refusal), CLI dry run output, and the no-vendor-calls check. Pitfall: a test GIF made of near-identical frames is merged by Pillow on save; make frames visibly different.
 
 ## 14. Reporting checklist
 - Update docs/problem_solution.md with any new problem

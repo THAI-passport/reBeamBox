@@ -180,7 +180,7 @@ class SimNn20(SimBadge):
 
     def on_subscribe(self, uuid):
         st = json.dumps({"freespace": self.freespace, "allspace": 32000, "time_mode": self.time_mode,
-                         "devname": "SIM-NN20", "brand": "sim", "type": 1, "size": 368}, separators=(",", ":"))
+                         "devname": "SIM-NN20", "brand": "sim", "type": 13, "size": "368,368"}, separators=(",", ":"))
         self.link.push(nn20.NOTIFY, nn20.make_reply(1, st))
 
     def on_write(self, uuid, data):

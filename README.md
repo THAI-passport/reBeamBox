@@ -29,6 +29,9 @@ python -m rebeambox ...                          # same as the command
 ```
 Press the badge Bluetooth button once first (the app's instructions say this enables phone transfer). If your badge advertises a different name, add `--name <prefix>`.
 
+## Models
+`--model nikko|nano|niji` (Nikko is the Pulse). It adds the model name to the scan filter, sets the default size (368) and video cap (3 s, Niji 5 s) and picks the still encoding. All three speak the nn20 service 0x01F0 according to third-party reports, so stills go out as a one-frame animation container (type 5); `--nn20-still album` selects the app's type 6 path. Put the badge on its pairing screen first, it advertises as `E-badge` only then. Details: docs/models.md.
+
 ## Dry run (no Bluetooth)
 ```
 rebeambox send-image photo.jpg --dry-run frames.txt
@@ -52,6 +55,7 @@ python -m pytest tests -q
 
 ## Docs
 - docs/PROTOCOL.md: byte-exact protocol, with Confirmed/Inferred tags
+- docs/models.md: NIKKO, NANO, NIJI comparison, transport per model, web recon
 - docs/pulse.md: Pulse-specific findings and how the client handles them
 - docs/ads-removal.md: how the original app shows promotions, and that this client has none
 - docs/SOP.md: reverse engineering procedure

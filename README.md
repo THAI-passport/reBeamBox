@@ -106,3 +106,4 @@ python -m pytest -q                  # no hardware (250 pass, 1 skip); see docs/
 Not affiliated with the badge vendor. The original app and its assets are not included or modified.
 
 - [Hardware recon checklist](docs/hardware-recon-checklist.md)
+- [Web reconnaissance (FCC, teardowns, retail, related projects)](docs/recon-web.md)

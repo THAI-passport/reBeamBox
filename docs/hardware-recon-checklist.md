@@ -1,5 +1,7 @@
 # Hardware Reconnaissance and Flash Endurance Checklist
 
+> Cross-reference (added 2026-10): public findings that overlap this checklist are collected in [recon-web.md](recon-web.md) (FCC filing contents, chip and flash reports from third-party teardowns, firmware layout). On fccid.io only `2BR3T-BAGDE0` exists; `2BR3T-BADGE0` returned 404, so treat it as a spelling variant. The filing lists a Bluetooth band only (no Wi-Fi) and keeps the block diagram, schematic and parts list confidential.
+
 Audience: Embedded engineers and autonomous agents working with physical Beambox hardware.
 
 Repository Context: reBeamBox (commit post-1b84ecd).

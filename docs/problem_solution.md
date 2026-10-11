@@ -366,3 +366,10 @@ Entry format: date, phase, problem, cause, solution (or Status: Unsolved plus wh
 - Problem: Looked for frame size, packet size or storage limits in libjl_fatfs, libjl_pack_format, libjl_enc, libjl_ota_auth, libcbuf and the FFmpeg kit.
 - Cause: Those libraries serve watch-face tooling, OTA and audio; the badge picture limits are Java constants.
 - Solution: Documented constants (FatFs sector 512, mkfs unit 4096, FFmpeg n6.0 with mjpeg and avi) in binaries.md; found unexplored RCSP storage commands (browse, delete, format) in the SDK and recorded their ids in PROTOCOL.md 3.7.2 as Unknown payloads.
+
+## 52. FCC ID spelling and unreliable aggregator text
+- Date: 2026-10-11
+- Phase: web recon
+- Problem: The checklist names `2BR3T-BADGE0` and `2BR3T-BAGDE0`; one returned 404. A search summary also quoted "1.28-inch LED display" for Pulse, conflicting with Nikko's 1.83 inch IPS.
+- Cause: The grant itself spells the product code "BAGDE0" ("E-Bagde"); marketing copy on resale pages is loose.
+- Solution: Verified on the registry page, kept both spellings noted, labelled retail claims W, flagged Pulse panel size as unresolved in docs/recon-web.md and asked H1 to record the physical diagonal. Third-party blog contents are W, not Confirmed.

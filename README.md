@@ -1,11 +1,63 @@
 # reBeamBox
 
-Open-source replacement client for the Beambox+ badge (BLE).
+Open-source Python client for Beambox-style round e-badges (Beambox e-Badge Pulse, Beambox+) over Bluetooth LE.
+Sends JPG/PNG stills, GIFs, short videos (3 s default cap) and rendered text or name tags. No vendor account, no cloud, no ads, no telemetry.
+
+STATUS: written from static analysis of the Android app. It has NOT been tested on real hardware. Byte layouts are documented and unit-tested against a software badge, but expect to debug on first contact (see docs/PROTOCOL.md section 6.4). Use `--dry-run` first.
+
+## Install
+Python 3.10+ is required. ffmpeg is needed only for GIF and video (stills and text do not need it).
+```
+python3 -m venv .venv
+. .venv/bin/activate            # Windows: .venv\Scripts\activate
+pip install -e .                # installs bleak and Pillow, plus the `rebeambox` command
+pip install -e .[dev]           # adds pytest etc.
+# ffmpeg: apt install ffmpeg | brew install ffmpeg | winget install ffmpeg
+```
+
+## Quick start
+```
+rebeambox scan                                   # list badges (NEO, B-Device, tag 0xB3, plus --name)
+rebeambox scan --name Pulse --all                # show everything, mark matches
+rebeambox send-image photo.jpg                   # 360x360 circular crop, or the size the badge reports
+rebeambox send-image photo.png --square --size 368
+rebeambox send-gif party.gif
+rebeambox send-video clip.mp4 --fps 15           # first 3 s only (--max-seconds)
+rebeambox send-text "Somchai" --subtitle "Bangkok" --bg "#102040" --font /path/to/NotoSansThai.ttf
+rebeambox send-image photo.jpg --address AA:BB:CC:DD:EE:FF --name Pulse
+python -m rebeambox ...                          # same as the command
+```
+Press the badge Bluetooth button once first (the app's instructions say this enables phone transfer). If your badge advertises a different name, add `--name <prefix>`.
+
+## Dry run (no Bluetooth)
+```
+rebeambox send-image photo.jpg --dry-run frames.txt
+rebeambox send-image photo.jpg --dry-run frames_nn20.txt --transport nn20
+rebeambox send-text "Hi" --dry-run t.txt --pic 240 240
+```
+`frames.txt` lists every GATT write (W) and simulated badge notification (N) with characteristic, length and hex; `frames.txt.payload` is the exact file (JPEG, AVI or nn20 container) that was sent. The simulated badge runs the real auth, bind, storage discovery and device-pulled transfer, so a dry run exercises the whole protocol code.
+
+## Bluetooth permissions
+- Linux: BlueZ 5.55+ and the `bluetooth` service. Run as a normal user in the `bluetooth` group (or grant `cap_net_raw` to Python for scanning). No location permission is needed.
+- macOS: first run asks for Bluetooth access for your terminal app (System Settings, Privacy and Security, Bluetooth). Addresses are UUIDs, use `rebeambox scan` to find yours.
+- Windows 10/11: turn Bluetooth on; no pairing is needed. If connection fails, remove the badge from Windows paired devices (the badge uses application-level binding, not OS pairing).
+
+## How it works
+Transport is chosen by service discovery: control service C2E6FD00 plus Jieli 0xAE00 (BadgeSdk path: bind, picture size, Jieli auth, RCSP large-file transfer), or service 0x01F0 (nn20 path: IMB still or animation container in framed packets with ACK pacing). See docs/PROTOCOL.md.
+
+## Tests
+```
+python -m pytest tests -q
+```
 
 ## Docs
+- docs/PROTOCOL.md: byte-exact protocol, with Confirmed/Inferred tags
+- docs/pulse.md: Pulse-specific findings and how the client handles them
+- docs/ads-removal.md: how the original app shows promotions, and that this client has none
 - docs/SOP.md: reverse engineering procedure
-- docs/PROTOCOL.md: BLE protocol (draft)
 - docs/app-behaviour.md, docs/binaries.md: app and binary notes
 - docs/problem_solution.md: running log of problems and solutions
-- docs/hardware-prediction.md: streaming design, flaws, hardware guess
-- docs/streaming-plan.md: phased plan for phone-to-badge live streaming
+- docs/hardware-prediction.md, docs/streaming-plan.md: streaming design
+- scripts/spec_vectors.py, tools/emulate_jl_auth.py: spec vector generator, native auth emulation (needs the library, not shipped)
+
+Not affiliated with the badge vendor. The original app and its assets are not included or modified.

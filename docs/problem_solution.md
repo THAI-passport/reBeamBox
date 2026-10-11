@@ -192,3 +192,31 @@ Entry format: date, phase, problem, cause, solution (or Status: Unsolved plus wh
 - Phase: Spec
 - Problem: A recursive grep with a multi-name find hung a shell for 30 s.
 - Solution: Narrow directories and use timeout. Status: Solved.
+
+## 28. Simulated badge never completed the transfer
+- Date: 2026-10-11
+- Phase: Client
+- Problem: First session-against-simulator run stalled with "no progress for 20 s".
+- Cause: The simulator encoded the target-info CRC attribute with record length 6 instead of 5 (length counts the type byte), so the client parsed no CRC flag and sent frames without per-packet CRC that the simulator then rejected.
+- Solution: Fixed the simulator record length. Lesson: record `len` includes the type byte; a mismatch silently shifts the parse. Status: Solved. The LTV length rule itself is still [I] for real hardware.
+
+## 29. No Pulse data in the app
+- Date: 2026-10-11
+- Phase: Client
+- Problem: Asked for Pulse-specific names, ids and shapes from the decompiled code.
+- Cause: The app has no "Pulse" product table; products arrive from the server list at runtime.
+- Solution: Documented in docs/pulse.md; added configurable name filter (--name). Status: Unsolved offline; needs a scan of a real Pulse or the product list response.
+
+## 30. Pillow merged identical GIF frames in a test
+- Date: 2026-10-11
+- Phase: Tests
+- Problem: Expected 30 frames at 100 ms, got interval 357 ms.
+- Cause: Test frames repeated colours (byte overflow); Pillow drops duplicate consecutive frames and sums their delay.
+- Solution: Use distinct frames. Status: Solved.
+
+## 31. Scan on a machine without Bluetooth printed a bare errno
+- Date: 2026-10-11
+- Phase: Client
+- Problem: `rebeambox scan` on the headless box printed "[Errno 2] No such file or directory".
+- Cause: bleak/BlueZ D-Bus socket missing.
+- Solution: CLI now prints a hint about a missing adapter or BlueZ. Status: Solved.

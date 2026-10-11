@@ -120,8 +120,12 @@ def main(argv=None):
                 print("no badges found")
             return 0
         return asyncio.run(_run_send(args))
-    except (media.MediaError, FileNotFoundError) as e:
+    except media.MediaError as e:
         print("error: %s" % e, file=sys.stderr)
+        return 1
+    except FileNotFoundError as e:
+        hint = "no Bluetooth adapter or BlueZ/D-Bus not available" if "No such file" in str(e) and not getattr(e, "filename", None) else "file not found"
+        print("error: %s (%s)" % (hint, e), file=sys.stderr)
         return 1
     except Exception as e:
         print("error: %s: %s" % (type(e).__name__, e), file=sys.stderr)

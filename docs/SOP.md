@@ -123,10 +123,17 @@ Outputs: docs/PROTOCOL.md, docs/app-behaviour.md, docs/binaries.md, and docs/har
 Read in this order: frame packer/parser (ParseHelper, BasePacketParse), command classes (opcode in the super constructor, param toData/parse), response handlers (cmdHandler classes switch on opcode), then the task that sequences them (TransferTask). Types in the base classes decide the "wants response" flag. Write pure-function builders (rebeambox/rcsp.py) and unit tests with frames derived by hand.
 
 ## 12. Phase: build the client
-In progress. Reference modules so far: rebeambox/jl_auth.py (auth), rebeambox/rcsp.py (RCSP frames and transfer payloads). Plan: docs/streaming-plan.md. Planned: Python client with bleak and Pillow, scan and connect, image and GIF conversion to 360x360, chunked writes with flow control, CLI. Icons only (Lucide) in any UI, no emoji.
+Done (v0.1, untested on hardware). Procedure that worked:
+1. Layer the client like the protocol: pure byte builders and parsers first (control.py, nn20.py, rcsp.py, jl_auth.py), then media conversion (media.py), then async sessions written against an abstract Link (session.py, link.py), then the CLI. Only link.BleakLink touches Bluetooth.
+2. Write the badge side as a simulator (sim.py) that implements the documented protocol, including auth and the device-pulled file transfer. Run the real session code against it. This finds client state-machine bugs without hardware and powers `--dry-run` (RecordingLink logs every write and notification in order).
+3. Keep every uncertain value a named constant or option (device-name filters, picture size, animation type, MTU) so first hardware contact only needs flag changes.
+4. Choose the transport by service discovery after connecting, not by name.
+5. Product questions that code cannot answer (for example what BLE name the Pulse uses) become CLI options, and are recorded in docs/pulse.md.
+6. Prove the client has no vendor calls with a test that greps the package for URLs and network modules (tests/test_no_vendor_calls.py), and document any promotional surfaces of the original in docs/ads-removal.md.
+Modules: control (0x9E frames), rcsp and jl_auth (Jieli), nn20 (containers and framing), media (Pillow, ffmpeg using the documented AVI command), scan, link, session, sim, client, cli.
 
 ## 13. Phase: tests
-Started: tests/test_jl_auth.py and tests/test_rcsp.py (run `.venv/bin/python -m pytest tests`). Planned: pytest unit tests for packet serialization, checksum, chunking, and frame conversion; golden vectors derived from the spec; no hardware required.
+`.venv/bin/python -m pytest tests -q` (47 tests, no hardware, ffmpeg tests skip if ffmpeg is missing). Coverage: frame serialization and checksums (control, nn20, rcsp), auth vectors frozen from the native library emulation, container layouts, media conversion and the 3 s cap, session flows against the simulators (still, animation, no packet CRC, retry after a failed packet, free-space refusal, memory refusal), CLI dry run output, and the no-vendor-calls check. Pitfall: a test GIF made of near-identical frames is merged by Pillow on save; make frames visibly different.
 
 ## 14. Reporting checklist
 - Update docs/problem_solution.md with any new problem

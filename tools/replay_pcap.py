@@ -178,7 +178,8 @@ def guess_role(value):
 
 # --- decoders --------------------------------------------------------------------------------------
 def decode_nn20(values):
-    """Group F1 frames into transfers. Returns list of dicts with the reassembled envelope."""
+    """Group F1 frames into transfers. Returns list of dicts with the reassembled envelope.
+    Reports bad checksums and sequence gaps (dropped or repeated packets) instead of failing."""
     out, cur = [], None
     for v in values:
         if len(v) < 9 or v[0] != 0xF1:
@@ -191,24 +192,39 @@ def decode_nn20(values):
             out.append({"type": typ, "packets": 1, "bad_checksums": 0 if ok else 1, "settings": data.decode("utf-8", "replace")})
             continue
         if rem == n - 1 or cur is None:
-            cur = {"type": typ, "packets": n, "bad_checksums": 0, "got": 0, "env": bytearray()}
+            cur = {"type": typ, "packets": n, "bad_checksums": 0, "got": 0, "env": bytearray(), "gaps": [], "expected": n - 1}
             out.append(cur)
+        if rem != cur["expected"]:
+            cur["gaps"].append({"expected_remaining": cur["expected"], "got_remaining": rem})
+        cur["expected"] = rem - 1
         cur["got"] += 1
         cur["env"] += data
         cur["bad_checksums"] += 0 if ok else 1
     for t in out:
         if "env" in t:
-            t["complete"] = t["got"] == t["packets"]
+            t.pop("expected")
+            t["complete"] = t["got"] == t["packets"] and not t["gaps"]
             t["envelope"] = bytes(t.pop("env"))
             pre = b'{"type":%d,"data":' % t["type"]
-            if t["envelope"].startswith(pre) and t["envelope"].endswith(b"}"):
+            if not t["complete"]:
+                t["container"] = {"kind": "incomplete", "frames": []}
+            elif t["envelope"].startswith(pre) and t["envelope"].endswith(b"}"):
                 t["payload"] = t["envelope"][len(pre):-1]
                 t["container"] = decode_container(t["payload"])
+            else:
+                t["container"] = {"kind": "bad envelope", "frames": []}
     return out
 
 
 def decode_container(b):
-    """IMB still or 0x12345678 animation container -> dict with JPEG frames."""
+    """IMB still or 0x12345678 animation container -> dict with JPEG frames. Never raises."""
+    try:
+        return _decode_container(b)
+    except (struct.error, IndexError, ValueError):
+        return {"kind": "corrupt", "frames": []}
+
+
+def _decode_container(b):
     if b[:4] == b"IMB\x00" and len(b) >= 36:
         ln = struct.unpack_from("<i", b, 24)[0]
         w, h = struct.unpack_from("<hh", b, 16)
@@ -231,6 +247,7 @@ def decode_control(values):
 
 
 def decode_rcsp(values):
+    """Reassemble the AE01 write stream. Reports per-chunk CRC16 errors and sequence gaps of the file data."""
     buf, frames, raw, data_chunks = b"".join(values), [], [], []
     while buf:
         i = buf.find(rcsp.HEAD)
@@ -239,21 +256,64 @@ def decode_rcsp(values):
             break
         if i:
             raw.append(buf[:i].hex())                 # auth exchange bytes are not framed
-        f, rest = rcsp.unpack(buf[i:])
+        try:
+            f, rest = rcsp.unpack(buf[i:])
+        except (struct.error, IndexError):
+            break
         if f is None:
             break
         frames.append(f)
         buf = rest
     for f in frames:
-        if f["opcode"] == rcsp.OP_DATA and f.get("xm_opcode") == rcsp.OP_LARGE_OP and f["command"]:
+        if f["opcode"] == rcsp.OP_DATA and f.get("xm_opcode") == rcsp.OP_LARGE_OP and f["command"] and len(f["payload"]) >= 1:
             data_chunks.append(f["payload"])
-    with_crc = bool(data_chunks) and len(data_chunks[0]) >= 3 and \
-        rcsp.crc16_xmodem(data_chunks[0][3:]) == struct.unpack(">H", data_chunks[0][1:3])[0]
+
+    def crc_ok(c):
+        return len(c) >= 3 and rcsp.crc16_xmodem(c[3:]) == struct.unpack(">H", c[1:3])[0]
+    with_crc = any(crc_ok(c) for c in data_chunks)
+    crc_errors = [k for k, c in enumerate(data_chunks) if with_crc and not crc_ok(c)]
+    seq_gaps, prev = [], None
+    for k, c in enumerate(data_chunks):
+        if prev is not None and c[0] != (prev + 1) & 0xFF:
+            seq_gaps.append({"index": k, "expected_seq": (prev + 1) & 0xFF, "got_seq": c[0]})
+        prev = c[0]
     body = b"".join(c[3:] if with_crc else c[1:] for c in data_chunks)
     kind = "jpeg" if body[:2] == b"\xff\xd8" else "avi" if body[:4] == b"RIFF" else "unknown" if body else "none"
     return {"frames": len(frames), "opcodes": sorted({"0x%02X" % f["opcode"] for f in frames}),
             "unframed_chunks": raw, "file_chunks": len(data_chunks), "chunk_crc16": with_crc,
+            "crc_errors": crc_errors, "seq_gaps": seq_gaps,
             "file": body, "file_kind": kind}
+
+
+def decode_auth(seq):
+    """seq: ordered [(dir, bytes)] on AE01 (tx) and AE02 (rx). Checks the Jieli challenge-response against E1 with the
+    default key. Returns None when no auth traffic is present."""
+    from rebeambox import jl_auth
+    steps, st = [], {"complete": False}
+    app_r = dev_r = None
+    for d, b in seq:
+        if d == "tx" and len(b) == 17 and b[0] == 0:
+            app_r = b
+            steps.append("app challenge")
+        elif d == "rx" and len(b) == 17 and b[0] == 1 and app_r is not None and "badge_response_valid" not in st:
+            st["badge_response_valid"] = b == jl_auth.encrypt_challenge(app_r)
+            steps.append("badge response (%s)" % ("valid" if st["badge_response_valid"] else "WRONG"))
+        elif d == "tx" and b[:5] == jl_auth.AUTH_OK and len(b) == 5:
+            steps.append("app pass")
+        elif d == "rx" and len(b) == 17 and b[0] == 0:
+            dev_r = b
+            steps.append("badge challenge")
+        elif d == "tx" and len(b) == 17 and b[0] == 1 and dev_r is not None:
+            st["app_response_valid"] = b == jl_auth.encrypt_challenge(dev_r)
+            steps.append("app response (%s)" % ("valid" if st["app_response_valid"] else "WRONG"))
+        elif d == "rx" and b[:5] == jl_auth.AUTH_OK and len(b) == 5 and "app_response_valid" in st:
+            st["complete"] = True
+            steps.append("badge pass")
+    if not steps:
+        return None
+    st["steps"] = steps
+    st["ok"] = bool(st["complete"] and st.get("badge_response_valid") and st.get("app_response_valid"))
+    return st
 
 
 # --- analysis --------------------------------------------------------------------------------------
@@ -265,6 +325,7 @@ def analyze(path, overrides=None):
         hmap[h] = ROLES[role]
     writes = {"nn20": [], "control": [], "rcsp": []}
     notifs = {"nn20": [], "control": []}
+    rcsp_seq = []
     unmatched = 0
     for ev in evs:
         p = ev["pdu"]
@@ -273,11 +334,15 @@ def analyze(path, overrides=None):
             role = role_of(hmap.get(h)) or guess_role(value)
             if role:
                 writes[role].append(value)
+                if role == "rcsp":
+                    rcsp_seq.append(("tx", value))
             else:
                 unmatched += 1
         elif ev["opcode"] == 0x1B and len(p) >= 3 and ev["dir"] in ("rx", None):
             h = struct.unpack("<H", p[1:3])[0]
             r = next((role for key, role in NOTIFY_ROLES.items() if hmap.get(h, "").startswith(key)), None)
+            if r == "rcsp":
+                rcsp_seq.append(("rx", p[3:]))
             if r in notifs:
                 notifs[r].append(p[3:])
     res = {"file": path, "hci_packets": len(packets), "att_pdus": len(evs), "mapped_handles": {"0x%04X" % h: u for h, u in hmap.items()},
@@ -285,9 +350,34 @@ def analyze(path, overrides=None):
     res["nn20"] = decode_nn20(writes["nn20"])
     res["control"] = decode_control(writes["control"])
     res["rcsp"] = decode_rcsp(writes["rcsp"]) if writes["rcsp"] else None
+    res["rcsp_auth"] = decode_auth(rcsp_seq)
+    res["warnings"] = warnings(res)
     nn_replies, _ = nn20.parse_reply_stream(b"".join(notifs["nn20"]))
     res["nn20_replies"] = [t for _ty, t in nn_replies]
     return res
+
+
+def warnings(res):
+    w = []
+    for k, t in enumerate(res["nn20"]):
+        if "settings" in t:
+            continue
+        if t["bad_checksums"]:
+            w.append("nn20 transfer #%d: %d packet(s) with a bad checksum" % (k, t["bad_checksums"]))
+        for g in t["gaps"]:
+            w.append("nn20 transfer #%d: sequence gap, expected remaining %d, got %d" % (k, g["expected_remaining"], g["got_remaining"]))
+        if not t["complete"]:
+            w.append("nn20 transfer #%d incomplete: %d of %d packets" % (k, t["got"], t["packets"]))
+    r = res.get("rcsp")
+    if r:
+        if r["crc_errors"]:
+            w.append("rcsp file chunks with a bad CRC16: %s" % r["crc_errors"])
+        for g in r["seq_gaps"]:
+            w.append("rcsp file chunk %d: sequence %d, expected %d" % (g["index"], g["got_seq"], g["expected_seq"]))
+    a = res.get("rcsp_auth")
+    if a and not a["ok"]:
+        w.append("rcsp authentication did not complete cleanly: %s" % ", ".join(a["steps"]))
+    return w
 
 
 def save_extracts(res, outdir):
@@ -337,6 +427,10 @@ def summary(res):
     if r:
         L.append("rcsp: %d frames, opcodes %s, %d file chunks (crc16 %s), file %s %d bytes, %d unframed (auth) chunks" % (
             r["frames"], ",".join(r["opcodes"]), r["file_chunks"], r["chunk_crc16"], r["file_kind"], len(r["file"]), len(r["unframed_chunks"])))
+    if res.get("rcsp_auth"):
+        L.append("rcsp auth: %s (%s)" % ("ok" if res["rcsp_auth"]["ok"] else "NOT ok", ", ".join(res["rcsp_auth"]["steps"])))
+    for w in res.get("warnings", []):
+        L.append("WARNING: " + w)
     if res["nn20_replies"]:
         L.append("nn20 replies: %d (first: %s)" % (len(res["nn20_replies"]), res["nn20_replies"][0][:80]))
     return "\n".join(L)

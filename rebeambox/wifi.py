@@ -197,36 +197,74 @@ class WifiSession:
         finally:
             await ctrl.close()
 
+    def live(self):
+        """Open-ended camera-mode session for the streaming pipeline (rebeambox/streaming.py)."""
+        return WifiLive(self)
+
     async def stream(self, frames, fps=2.0, progress=None):
         """frames: iterable of JPEG bytes (each <= 30720). fps is clamped to the app's 300 ms spacing."""
         interval = max(MIN_FRAME_INTERVAL, 1.0 / fps)
-        ctrl = await self._open("ctrl")
+        live = self.live()
+        await live.start()
         try:
-            await ctrl.send(CMD_CAM_START)
-            if (await ctrl.recv(5.0)) != REPLY_CAM_OPEN:
-                raise WifiError("badge did not confirm camera mode (expected 007B)")
             n = 0
             for jpeg in frames:
-                if len(jpeg) > MAX_JPEG:       # the app only warns; the client drops (badge buffer limit is probably 30 KB)
-                    self.dropped += 1
-                    self.log("dropped frame of %d bytes (limit %d)" % (len(jpeg), MAX_JPEG))
+                state = await live.send(jpeg, interval if self.pace else 0.001)
+                if state == "dropped":
                     continue
-                if len(jpeg) < MIN_JPEG:
-                    jpeg = pad_jpeg(jpeg)
-                await ctrl.send(camera_frame(jpeg))
                 n += 1
                 if progress:
                     progress(n)
-                r = await ctrl.recv(interval if self.pace else 0.001)
-                if REPLY_SHOT in r:
-                    self.shots += 1
-                    self.log("badge shutter event")
-                    await ctrl.send(CMD_SHOT_DONE)
-                if REPLY_CAM_CLOSED in r:
-                    self.log("badge closed camera mode")
+                if state == "closed":
                     return n
-            await ctrl.send(CMD_CAM_STOP + FRAME_END)
-            await ctrl.recv(2.0 if self.pace else 0.001)
+            await live.stop()
             return n
         finally:
-            await ctrl.close()
+            await live.close()
+
+
+class WifiLive:
+    """One camera-mode connection: start, any number of frames, stop. Used by WifiSession.stream and the pipeline."""
+
+    def __init__(self, session):
+        self.s, self.ctrl, self.sent = session, None, 0
+
+    async def start(self):
+        self.ctrl = await self.s._open("ctrl")
+        try:
+            await self.ctrl.send(CMD_CAM_START)
+            if (await self.ctrl.recv(5.0)) != REPLY_CAM_OPEN:
+                raise WifiError("badge did not confirm camera mode (expected 007B)")
+        except BaseException:
+            await self.close()
+            raise
+
+    async def send(self, jpeg, wait):
+        """Send one frame. Returns 'sent', 'dropped' (over the badge limit) or 'closed' (the badge left camera mode)."""
+        s = self.s
+        if len(jpeg) > MAX_JPEG:       # the app only warns; the client drops (badge buffer limit is probably 30 KB)
+            s.dropped += 1
+            s.log("dropped frame of %d bytes (limit %d)" % (len(jpeg), MAX_JPEG))
+            return "dropped"
+        if len(jpeg) < MIN_JPEG:
+            jpeg = pad_jpeg(jpeg)
+        await self.ctrl.send(camera_frame(jpeg))
+        self.sent += 1
+        r = await self.ctrl.recv(wait)
+        if REPLY_SHOT in r:
+            s.shots += 1
+            s.log("badge shutter event")
+            await self.ctrl.send(CMD_SHOT_DONE)
+        if REPLY_CAM_CLOSED in r:
+            s.log("badge closed camera mode")
+            return "closed"
+        return "sent"
+
+    async def stop(self):
+        await self.ctrl.send(CMD_CAM_STOP + FRAME_END)
+        await self.ctrl.recv(2.0 if self.s.pace else 0.001)
+
+    async def close(self):
+        if self.ctrl is not None:
+            await self.ctrl.close()
+            self.ctrl = None

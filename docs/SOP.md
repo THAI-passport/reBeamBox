@@ -163,6 +163,12 @@ Build tooling that makes the first hardware session cheap and loss-free: (1) a r
 ## 13.2 Fixtures, aggregation and CI
 Once a parser exists, give it regression data before real captures arrive: generate small synthetic captures with the same builders the client uses (deterministic, committed with a manifest that says SYNTHETIC, plus a `--check` mode so drift fails CI), include a deliberately malformed one (bad checksum, bad CRC, dropped sequence number) and require the tool to report it instead of crashing. Aggregate field reports with an idempotent script that rewrites only a marked block of a document. Put the project rules (no emoji, no analytics hosts, no non-local URLs in code) in a lint script with its own tests and run it in CI next to the explicit no-vendor-calls test. CI pitfalls: tests that need an extracted native library must skip when it is absent (it is not in the repository); verify by running the suite with the library hidden. Document protocols with sequence diagrams only from the code path that implements them and label inferred steps in the diagram text.
 
+## 13.3 Safe-write policy and streaming prototype
+1. Before adding any "send often" feature, find out what a send costs the device (here: a flash write, from third-party teardown reports labelled W) and add a guard first: per-device counter in a state file that stores a hash of the identifier, a hash of the last payload for skipping unchanged sends, a minimum interval, and warning thresholds; count only after success; keep dry runs out of the counter. Put the check where the payload is known (after the handshake) and before the first data frame. Test the guard with an injected clock.
+2. Build a streaming pipeline as small replaceable stages (source, crop, encode, rate control, sink) with an injectable clock: a virtual clock makes a 20 s stream run in milliseconds and the tests deterministic. Model the link with named, labelled assumptions and print them next to any number derived from them; only hardware numbers may be called measured.
+3. When a transport has no live mode, say so in code and in the benchmark: the BLE sink sends clips, goes through the write guard, and its numbers are labelled a slideshow.
+4. Benchmarks are a script that regenerates a document (`tools/bench_stream.py --write`), so the document never drifts from the code.
+
 ## 14. Reporting checklist
 - Update docs/problem_solution.md with any new problem
 - Tools and versions
@@ -172,6 +178,9 @@ Once a parser exists, give it regression data before real captures arrive: gener
 - Issues and open questions
 
 ## 15. Thought process and tooling (why each tool, how probed, outcome, decision)
+- CFR and dex2jar (added): why: jadx cannot type a method whose register is reused as long and double. Installed without sudo: CFR jar from Maven Central, dex2jar release zip from GitHub into `~/tools`, driven by `scripts/recover-failed-methods.sh`. Worked: CFR decompiled the animation builder cleanly and matched the smali. Failed: jadx `--show-bad-code` and `-m simple` do not fix type failures (simple mode does remove the region-maker overflows, 63 errors to 35). Decision: smali first, CFR to confirm, jadx simple mode for the rest; never trust one decompiler for a critical method.
+- capstone and pyelftools, second use (native pass 3): list exports first (`.dynsym` with sizes), classify by name, then disassemble only functions that look like constants (disk init, ioctl, mkfs wrapper). Result: the extra libraries held no badge limits; recording a negative result is part of the work.
+- WebSearch and WebFetch, recon: search the FCC grant first (the registry page names grantee, exhibits and bands), then teardown posts and open-source clients for the same chip; fetch the full article rather than relying on a summary snippet, label every claim W, and keep a table of conflicts (retail copy versus spec sheets) instead of resolving them silently.
 Format per tool: why, how installed or probed, worked, failed, decision. Update this section whenever a tool choice changes. Related: problem_solution.md has the dated failures.
 
 General rule used throughout: probe a tool with a version command or a ten-second smoke test before relying on it, record the result, and prefer tools installable in user space (the box has no sudo). When a tool fails, look for a smaller tool that does the same job rather than fighting the environment.

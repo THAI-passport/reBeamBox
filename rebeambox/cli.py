@@ -3,7 +3,7 @@ import argparse
 import asyncio
 import sys
 
-from . import __version__, client, link, media, models, safewrite, scan as scanmod, sim, wifi
+from . import __version__, client, link, media, models, safewrite, scan as scanmod, sim, streaming, wifi
 
 
 def _add_common(p):
@@ -68,9 +68,12 @@ def build_parser():
     p = sub.add_parser("send-video", help="send a video (first 3 s)"); p.add_argument("path"); _add_common(p)
     p.add_argument("--max-seconds", type=float, default=None, help="cap in seconds (default 3, or the --model profile)")
     p.add_argument("--fps", type=int, default=15)
-    p = sub.add_parser("stream", help="Wi-Fi live frames from a video or GIF (max 3.3 fps, 30 KB per frame)")
-    p.add_argument("path"); _add_common(p); p.add_argument("--fps", type=float, default=2.0)
+    p = sub.add_parser("stream", help="stream frames from a video, GIF or 'synthetic': Wi-Fi camera mode (default) or BLE clips (--transport nn20|badge)")
+    p.add_argument("path", help="video or GIF file, or the word synthetic for a generated test pattern"); _add_common(p)
+    p.add_argument("--fps", type=float, default=2.0, help="target frames per second (Wi-Fi is capped at 3.3 by the app's 300 ms spacing)")
+    p.add_argument("--source-fps", type=float, default=10.0, help="frame rate of the synthetic source or of video decoding")
     p.add_argument("--max-seconds", type=float, default=10.0)
+    p.add_argument("--segment-frames", type=int, default=6, help="BLE only: frames per clip (each clip is a flash write)")
     p = sub.add_parser("send-text", help="render text or a name tag and send it"); p.add_argument("text"); _add_common(p)
     p.add_argument("--subtitle"); p.add_argument("--fg", default="#ffffff"); p.add_argument("--bg", default="#000000")
     p.add_argument("--font", help="path to a .ttf (use a Thai-capable font for Thai text)")
@@ -137,10 +140,76 @@ def _wifi_dump(path, log_events, payload):
         fh.write(payload)
 
 
-def _stream_frames(args):
-    frames = media.load_video_frames(args.path, wifi.WIFI_SIZE, not args.square, max(1, round(args.fps)), args.max_seconds) \
-        if not args.path.lower().endswith(".gif") else media.load_gif_frames(args.path, wifi.WIFI_SIZE, not args.square, args.max_seconds)[0]
-    return [wifi.jpeg_under(f) for f in frames]
+async def _find_address(args, log):
+    from .scan import scan
+    if args.address:
+        return args.address
+    found = [d for d in await scan(args.timeout, args.name) if d["match"]]
+    if not found:
+        return None
+    log("using %s (%s)" % (found[0]["name"], found[0]["address"]))
+    return found[0]["address"]
+
+
+async def _run_stream(args, log):
+    apply_model(args)
+    transport = args.transport or "wifi"
+    dry = bool(args.dry_run)
+    clock = streaming.VirtualClock() if dry else streaming.RealClock()
+    src = streaming.open_source(args.path, args.source_fps, args.max_seconds)
+    events, sink = [], None
+    if transport == "wifi":
+        if args.model and args.size == models.get(args.model).size:
+            args.size = None
+        if dry:
+            badge = sim.SimWifiBadge()
+            mk = lambda name: wifi.SimChannel(badge, name, events)
+        else:
+            mk = lambda name: wifi.TcpChannel()
+        sess = wifi.WifiSession(mk, args.host, args.port, log, pace=not dry)
+        sink = streaming.WifiSink(sess.live(), clock, streaming.WIFI_MODEL if dry else None)
+        if args.size:
+            sink.size = args.size
+    else:
+        size = args.size or 368
+        if dry:
+            lks = []
+
+            async def open_link():
+                lk = link.RecordingLink(sim.SimNn20() if transport == "nn20" else sim.SimBadgeSdk(picture=tuple(args.pic)))
+                lks.append(lk)
+                return lk
+            gate = None
+        else:
+            addr = await _find_address(args, log)
+            if not addr:
+                print("no badge found; press the badge Bluetooth button, or pass --address / --name", file=sys.stderr)
+                return 2
+
+            async def open_link():
+                lk = link.BleakLink(addr)
+                await lk.connect()
+                return lk
+            gate = make_gate(args, addr, log)
+        period_ms = int(round(1000.0 / args.fps))
+        sink = streaming.BleSegmentSink(streaming.clip_uploader(open_link, transport, size, gate, log, fast=dry), clock,
+                                        args.segment_frames, period_ms, streaming.BLE_MODEL if dry else None, size)
+    pipe = streaming.Pipeline(src, sink, args.fps, not args.square, clock)
+    st = await pipe.run()
+    print(st.summary())
+    if dry:
+        if transport == "wifi":
+            _wifi_dump(args.dry_run, events, b"".join(sink.sent_jpegs))
+        else:
+            with open(args.dry_run, "w") as fh:
+                fh.write("# rebeambox stream dry run (%d clips): W = written by us, N = simulated badge notification\n" % len(lks))
+                for i, lk in enumerate(lks):
+                    fh.write("# clip %d\n" % (i + 1))
+                    fh.write(lk.dump())
+            with open(args.dry_run + ".payload", "wb") as fh:
+                fh.write(sink.payloads[-1] if sink.payloads else b"")
+        log("wrote %s" % args.dry_run)
+    return 0
 
 
 async def _run_wifi(args, log):
@@ -173,7 +242,9 @@ async def _run_wifi(args, log):
 async def _run_send(args):
     check_pacing(args)
     log = (lambda *_: None) if args.quiet else (lambda m: print(m, file=sys.stderr))
-    if args.cmd == "stream" or args.transport == "wifi":
+    if args.cmd == "stream":
+        return await _run_stream(args, log)
+    if args.transport == "wifi":
         apply_model(args)
         return await _run_wifi(args, log)
     job = make_job(args)

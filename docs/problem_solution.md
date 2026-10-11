@@ -381,3 +381,18 @@ Entry format: date, phase, problem, cause, solution (or Status: Unsolved plus wh
 - Problem: Delta skipping needs the hash of the payload, but the payload depends on the picture size the badge reports, so it cannot be computed before connecting.
 - Cause: Pictures are rendered at the size the badge advertises (368 versus 360).
 - Solution: The gate runs inside `client.send` after the handshake and before the first data frame; a skipped upload writes nothing to flash (only the handshake traffic happened). The counter is advanced after success only. Documented in docs/safe-write.md.
+
+
+## 54. Streaming benchmark quantised by the source frame grid
+- Date: 2026-10-11
+- Phase: streaming prototype
+- Problem: A 3.3 fps target gave 2.5 fps from a 10 fps synthetic source.
+- Cause: Frames exist only every 100 ms, so a 303 ms period waits for the 400 ms frame.
+- Solution: Benchmark source runs at 30 fps (3.0 fps delivered at a 3.3 target, 3.36 at 5); noted in the benchmark text that targets between grid steps round down. Floating point comparison got a 1e-6 tolerance so an exact 300 ms spacing is not skipped.
+
+## 55. BLE clips cannot be live and cannot bypass the write guard
+- Date: 2026-10-11
+- Phase: streaming prototype
+- Problem: A BLE "stream" is a series of uploads, each a flash write; at the safe-write default only one clip per 30 s passes.
+- Cause: nn20 and BadgeSdk have no live mode; the Wi-Fi camera mode is the only live path in the app.
+- Solution: The BLE sink is explicitly a clip sink, shares the safe-write gate, counts policy drops, and the benchmark labels it a slideshow.

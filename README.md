@@ -92,3 +92,5 @@ python -m pytest -q                  # no hardware (202 pass, 1 skip); see docs/
 - scripts/spec_vectors.py, tools/emulate_jl_auth.py: spec vector generator, native auth emulation (needs the library, not shipped)
 
 Not affiliated with the badge vendor. The original app and its assets are not included or modified.
+
+- [Hardware recon checklist](docs/hardware-recon-checklist.md)

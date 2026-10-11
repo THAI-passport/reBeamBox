@@ -66,3 +66,7 @@ observations (display, sound, reboot, disconnect):
 code or doc change needed:
 ```
 Report in the repository issue "First session: <model> <date>" (see first-session-checklist.md section 8) and append problems to problem_solution.md.
+
+## Related
+
+- [Hardware recon checklist](hardware-recon-checklist.md) (H8/H9 wear and physical dump path)

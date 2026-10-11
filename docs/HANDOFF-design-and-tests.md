@@ -160,3 +160,7 @@ python tools/replay_pcap.py btsnoop_hci.log --out extracted/     # decode a vend
 (cd ui && python3 -m http.server 8000)   # Web Bluetooth harness at http://localhost:8000
 ```
 Environment switches for tests: `JL_AUTH_SO` (path to libjl_auth.so for the native fuzz; default `analysis/work/so/lib/arm64-v8a/libjl_auth.so`), `REBEAMBOX_FUZZ_N`, `REBEAMBOX_FUZZ_SLOW_N`, `REBEAMBOX_THAI_FONT`. Rebuilding the analysis tree (jadx, apktool, APK download) is scripted in `scripts/setup-tools.sh` and described in `docs/SOP.md`; the APK is not redistributed.
+
+## Related docs
+
+- [Hardware recon checklist](hardware-recon-checklist.md)

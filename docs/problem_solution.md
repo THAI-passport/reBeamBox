@@ -234,3 +234,32 @@ Entry format: date, phase, problem, cause, solution (or Status: Unsolved plus wh
 - Problem: Asked for per-model code paths in m2/g.java, a0/j.java and wg/*; those files hold no model names (wg does not exist in the jadx output).
 - Cause: Product identity is server data; code keeps only placeholders and one NIJI comparison.
 - Solution: Full-tree case-insensitive grep, then traced the stored keys; documented in docs/models.md. Status: Solved (negative result).
+
+## 34. Wi-Fi sender hidden in unrelated packages
+- Date: 2026-10-11
+- Phase: Wi-Fi
+- Problem: The Wi-Fi socket code (WifiTransferManager) had no write method, and the call sites showed only `getClass()` stubs.
+- Cause: R8 moved the upload and command lambdas into a switch class in an androidx package (`processing/c`, `processing/i`) and a vendor OTA package.
+- Solution: Grepped for `f6020d.write` and `new byte[]{0,` across the tree to find the writers, then read the dispatcher cases. Status: Solved.
+
+## 35. Wrong claim about the HTTP uploader resume header
+- Date: 2026-10-11
+- Phase: Wi-Fi docs
+- Problem: First draft of docs/wifi-protocol.md said the OkHttp uploader used an X-Offset-like header.
+- Cause: Wrote it from the class shape before reading the request builder line (it was cut off by a narrow `cut`).
+- Solution: Read the line at full width: it sends `Content-Range: bytes start-end/total`. Doc fixed. Lesson added to SOP 12.2 step 4.
+
+## 36. First checklist draft contained impossible instructions
+- Date: 2026-10-11
+- Phase: first-session checklist
+- Problem: The draft described capturing the vendor app on the badge AP with a second computer and a non-existent `--address-less` flag, and referred to CLI tuning flags that do not exist.
+- Cause: Written quickly without checking `--help`.
+- Solution: Replaced with PCAPdroid on the phone for the reference capture, tcpdump on the computer joined to the AP for rebeambox, and removed the invented flags. Added `rebeambox probe` for the GATT dump instead.
+
+## 37. Camera frame length versus stop word in the software badge
+- Date: 2026-10-11
+- Phase: Wi-Fi simulator
+- Problem: In camera mode the stream mixes 2-byte length prefixes and 2-byte command words (0x007F stop, 0x0000 end), so a frame length of 127 would look like a stop word.
+- Cause: The protocol has no type byte.
+- Solution: Sim treats 0x007F as stop (a real JPEG is never 127 bytes). Real badge behaviour is unknown [U]; noted here so a capture can check how the firmware disambiguates.
+

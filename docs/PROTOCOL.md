@@ -16,7 +16,7 @@ Worked-example bytes come from `scripts/spec_vectors.py`, which only implements 
 |-----------|------|---------|
 | Name, upper-cased with non-alphanumerics removed, contains `NEO` or `BDEVICE` (from "B-Device") | "BadgeSdk" path (com.zijun.badgesdk): custom control service plus Jieli RCSP file transfer | 3 |
 | Anything else that matches the product's stored name filter (keySignalName, set when the user picks a product) | "nn20" path (com.example.nn20.manager): service 0x01F0 | 2 |
-| Wi-Fi products | TCP to 192.168.8.1 port 8080 (KeyConstant.DEVICE_IP/PORT); also Wi-Fi SoftAP flow (not analysed) | 5 |
+| Wi-Fi products | TCP to 192.168.8.1 port 8080 (KeyConstant.DEVICE_IP/PORT); see docs/wifi-protocol.md | 5 |
 
 [C] The BadgeSdk is a vendor SDK dedicated to "baji" (the Chinese term for pin badges) devices: it only accepts devices whose advertising data says type BAJI (see 3.1) and its picture-size and file-type enums mention a circle shape. [I] The Beambox+ round badge therefore most likely uses the BadgeSdk path. The nn20 path serves a sibling product family from the same vendor (names, a "Polly" pet device flow, Wi-Fi). Both are specified so a client can support either. Which one a real Beambox badge speaks must be confirmed with a capture (see 6).
 
@@ -320,8 +320,8 @@ Note the same E1/E21/SAFER+ family also appears in `function_E21` (E21(rand, add
 | RCSP frames themselves | no checksum seen in the frame; link-level integrity only | [I] |
 | IMB / 0x12345678 containers | no checksum or CRC inside | [C] |
 
-## 5. Wi-Fi path (summary) [C partially]
-`KeyConstant.DEVICE_IP = 192.168.8.1`, `DEVICE_PORT = 8080`; a TCP socket with 10 s connect timeout is used by the nn20 manager (classes v and w), and Wi-Fi upload uses the same 0x12345678 container with address-list length N*16+32 and `BinConverter.e` writes files. The badge acts as a SoftAP; the phone joins it. Detailed framing was not analysed.
+## 5. Wi-Fi path [C]
+Full analysis in docs/wifi-protocol.md. Summary: the badge is a SoftAP and DHCP gateway (192.168.8.1); the phone joins the SSID containing the product signal name (default `E-Badge`) and binds the process to that network. TCP port 8080 carries (a) 2-byte big-endian control words (0x0069 query storage, 0x005F end, 0x0079 start camera, 0x007B camera on, 0x007A shutter event from the badge, 0x007D photo saved, 0x007F stop, 0x0000 terminator), (b) live camera frames as `[len16][JPEG 360x360 q10, at most 30720 bytes][0000]` at most every 300 ms, and (c) a handwritten `POST /upload` with `X-Filename: NN.bin` carrying the IMB or 0x12345678 container (Wi-Fi address-list length N*16+32) in 6144-byte chunks. Selection is by the server product `deviceType` (`WiFi` vs `BT`), not by name. Client: `rebeambox --transport wifi`, `rebeambox stream`.
 
 ## 6. Transport selection and remaining unknowns (second code pass)
 
@@ -359,3 +359,15 @@ Reports on real Niji and Nano units (details and links in docs/models.md). Tag [
 - CORRECTION [W]: a still sent as type 6 with a raw JPEG is stored (free space drops) but shows black. A still sent as type 5 with the 0x12345678 container (one frame, interval 3000 ms, 368x368 JPEG) displays correctly. The IMB type 6 path of section 2.7 was not tested by that reporter (they sent a raw JPEG), so type 6 with IMB remains [I]. The client defaults to type 5 and offers `--nn20-still album`.
 - [W] The container, directory entry (12-byte name plus u32 offset) and 32-byte frame header in a Nano's flash match section 2.7. Header size field 360, JPEG data 368.
 - [C] Model-specific code: only the NIJI video window (5 s versus 10 s). See docs/models.md section 4.
+
+
+## 8. Badge-originated notifications, status fields and input events (code search, 2026-10)
+Question: does the badge ever report touch coordinates, button, switch, battery or mode events? Answer: touch coordinates are never reported on any path. The complete inventory [C], found by reading every parser reachable from a notification callback:
+
+nn20 path (0x01F2 replies): only UTF-8 JSON. The app's status record model has exactly these fields: `allspace` (int), `brand` (int), `devname` (string), `freespace` (int, KB), `size` (string, picture size such as "368,368"), `time_mode` (int), `type` (int). Used fields: `freespace` (storage display) and `time_mode` (1 selects the no-response loop protocol: the app labels the switch "Bluetooth no-response loop mode" and sends at a 20 ms interval without waiting for acknowledgements; any other value selects acknowledged batches). `GetPacketSuccess` and `GetPacketFail` texts are acknowledgements. No battery, charge, button, touch, motion, screen or mode-change field exists in the model and none is read elsewhere (a full-tree search for these names found nothing in the nn20 code). Unknown extra JSON keys would be ignored by the app, so a badge may send more; the first-session capture should check.
+
+BadgeSdk path (0x9E control channel and RCSP): the connection class reacts to exactly these incoming command codes: 0x61 bind reply, 0xC7 device info, 0xDB picture sizes, 0xFF command ack, 0x27 battery reply (two bytes: status, level; requested with command 0x29 and a one-byte argument), and 0x81 camera command (one byte). Camera command values handled by the app: 1 and 3 = take a photo (badge button as a remote shutter), 2 = leave camera mode, 4 = a preview-related request; the app starts and stops camera mode with command 0x81 and argument 0 (enter) or 2 (exit). Other commands the vendor library can decode (a generic table shared with other Jieli based products: 0x16, 0x17, 0x21 to 0x26, 0x28, 0x2E, 0x2F, 0x30, 0x32, 0x40, 0x49, 0x52, 0x70, 0x73, 0x80 to 0x83, 0x88, 0x8E to 0x90, 0xD6, 0xE8 and others) are not consumed by any app screen. Touch: there is no parser or listener with x and y fields anywhere.
+
+Wi-Fi path: single control words only (0x007A shutter, 0x007B camera on, 0x007F camera off, 0x006A/0x006B upload start ok/failed, text `SD:<n>KB` storage). No touch, battery or status JSON.
+
+Consequences for the client: (1) the Niji touch display is used locally by the badge firmware; no touch stream is exposed to the app, so a remote-control or drawing-from-touch feature cannot be built from the documented protocol. [I] The badge may still send undocumented notifications; capture with nRF Connect while touching the screen (first-session checklist). (2) Battery level is available only on the BadgeSdk path (0x29 then 0x27); no battery on nn20 or Wi-Fi in the app. (3) The shutter event is the only button event: BadgeSdk 0x81 value 1 or 3, Wi-Fi 0x007A. (4) The scrolling-text screen ("danmaku") on BLE products renders text locally into an animation (duration chosen 1 s and up) and uploads it as a normal animation, [I] there is no separate text protocol.

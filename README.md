@@ -32,6 +32,16 @@ Press the badge Bluetooth button once first (the app's instructions say this ena
 ## Models
 `--model nikko|nano|niji` (Nikko is the Pulse). It adds the model name to the scan filter, sets the default size (368) and video cap (3 s, Niji 5 s) and picks the still encoding. All three speak the nn20 service 0x01F0 according to third-party reports, so stills go out as a one-frame animation container (type 5); `--nn20-still album` selects the app's type 6 path. Put the badge on its pairing screen first, it advertises as `E-badge` only then. Details: docs/models.md.
 
+## Wi-Fi models and live frames
+Products that the vendor server marks as Wi-Fi expose an access point (SSID contains `E-Badge`, gateway 192.168.8.1). Join it with your OS first, then:
+```
+rebeambox send-image photo.jpg --transport wifi            # POST /upload on TCP 8080, 360x360
+rebeambox stream clip.mp4 --fps 2                          # live JPEG frames (at most 3.3 fps, 30 KB each)
+rebeambox send-image photo.jpg --transport wifi --dry-run w.txt   # software badge, no network
+rebeambox probe <ADDRESS> --json gatt.json                 # dump BLE services for a bug report
+```
+Details: docs/wifi-protocol.md. First hardware test: docs/first-session-checklist.md.
+
 ## Dry run (no Bluetooth)
 ```
 rebeambox send-image photo.jpg --dry-run frames.txt
@@ -50,11 +60,13 @@ Transport is chosen by service discovery: control service C2E6FD00 plus Jieli 0x
 
 ## Tests
 ```
-python -m pytest tests -q
+python -m pytest tests -q            # 64 tests, no hardware
 ```
 
 ## Docs
 - docs/PROTOCOL.md: byte-exact protocol, with Confirmed/Inferred tags
+- docs/wifi-protocol.md: Wi-Fi access point path, control words, live camera frames, upload
+- docs/first-session-checklist.md: what to capture and report on the first real badge test
 - docs/models.md: NIKKO, NANO, NIJI comparison, transport per model, web recon
 - docs/pulse.md: Pulse-specific findings and how the client handles them
 - docs/ads-removal.md: how the original app shows promotions, and that this client has none

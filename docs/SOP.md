@@ -138,8 +138,18 @@ Modules: control (0x9E frames), rcsp and jl_auth (Jieli), nn20 (containers and f
 3. Do web recon after the code pass: vendor spec pages, FCC filings (grantee, internal photos, chip), teardowns, and hands-on write-ups. Treat them as unverified, label them, and let hardware reports overrule code-only inferences (here: nn20 service only, type 5 container for stills).
 4. Put every model difference into a profile object (models.py) so the CLI option only selects data.
 
+## 12.2 Per-transport research: the Wi-Fi path
+Procedure that worked, reusable for any secondary transport:
+1. Start from the constants (IP, port, SSID substring) and grep every user of them; expect the real logic in obfuscated or misnamed classes (here the sender was a lambda dispatcher in an androidx package and a vendor OTA package, found by grepping for `getOutputStream` and `Socket`).
+2. Find the single place bytes are written, then walk backwards to every caller: that yields the complete command list (2-byte words) without needing the reader code.
+3. Read the reader (poll loop) for the reply words, and the UI handlers for what each means.
+4. Quote request text literally from the string builder; jadx shows it, `cut` can hide the tail of long lines (use wide columns).
+5. Frame rate and size limits live in the analyzer callback (a time check) and the encoder (quality, size warning), not in the transport.
+6. Build the software badge with the same state machine (control words, HTTP, camera mode) and serve it both in process (dry run) and over a loopback TCP server in a test.
+7. For input events: enumerate the incoming command parsers and listener interfaces, not text searches for names like touch; then state the negative result with the list.
+
 ## 13. Phase: tests
-`.venv/bin/python -m pytest tests -q` (52 tests, no hardware, ffmpeg tests skip if ffmpeg is missing). Coverage: frame serialization and checksums (control, nn20, rcsp), auth vectors frozen from the native library emulation, container layouts, media conversion and the 3 s cap, session flows against the simulators (still, animation, no packet CRC, retry after a failed packet, free-space refusal, memory refusal), CLI dry run output, and the no-vendor-calls check. Pitfall: a test GIF made of near-identical frames is merged by Pillow on save; make frames visibly different.
+`.venv/bin/python -m pytest tests -q` (64 tests, no hardware, ffmpeg tests skip if ffmpeg is missing). Coverage: frame serialization and checksums (control, nn20, rcsp), auth vectors frozen from the native library emulation, container layouts, media conversion and the 3 s cap, session flows against the simulators (still, animation, no packet CRC, retry after a failed packet, free-space refusal, memory refusal), CLI dry run output, and the no-vendor-calls check. Pitfall: a test GIF made of near-identical frames is merged by Pillow on save; make frames visibly different.
 
 ## 14. Reporting checklist
 - Update docs/problem_solution.md with any new problem
@@ -148,3 +158,82 @@ Modules: control (0x9E frames), rcsp and jl_auth (Jieli), nn20 (containers and f
 - Validation results and any suspicious findings
 - What was committed and pushed
 - Issues and open questions
+
+## 15. Thought process and tooling (why each tool, how probed, outcome, decision)
+Format per tool: why, how installed or probed, worked, failed, decision. Update this section whenever a tool choice changes. Related: problem_solution.md has the dated failures.
+
+General rule used throughout: probe a tool with a version command or a ten-second smoke test before relying on it, record the result, and prefer tools installable in user space (the box has no sudo). When a tool fails, look for a smaller tool that does the same job rather than fighting the environment.
+
+### gh (GitHub CLI)
+- Why: create the public repo and push every milestone without manual steps.
+- Probe: `gh auth status` before anything else; repo created with `gh repo create <name> --public --source . --push`.
+- Worked: authenticated on the box, repo THAI-passport/reBeamBox, push after every milestone.
+- Failed: first commit failed for a missing git identity (problem log); fixed with a repo-local identity, not a global one.
+- Decision: commit and push per milestone so work is never only local; keep the APK and decompiled tree out via .gitignore.
+
+### APKPure (and listing sites)
+- Why: need the real APK; the box cannot use Google Play. APKPure, APKMirror, Uptodown are the reputable mirrors; official site if one exists.
+- Probe: direct link pattern `https://d.apkpure.com/b/APK/<package>?version=latest` with curl following the redirect; compared sizes and versions with listing pages.
+- Worked: 75 MB download, inner base APK validated by `unzip -t` and apktool reading the manifest (package name, versionCode 24).
+- Failed: download passed the 30 s foreground limit (use a background job and wait); the file was an XAPK (a zip of split APKs); listing sites disagreed on version and size.
+- Decision: trust the file's own manifest over listing text, record URL, size and SHA-256 in analysis/SOURCES.md, never run the APK, never commit it.
+
+### Java, jadx, apktool
+- Why: jadx gives readable Java quickly for protocol tracing; apktool gives smali and resources when jadx fails.
+- Probe: user-space JRE, jadx release zip in ~/tools, apktool jar; `--version` on each, PATH via ~/.bashrc (new shells did not inherit PATH at first, so export explicitly in scripts).
+- Worked: jadx produced about 10,755 files in the background (log with carriage returns, read with `tr '\r' '\n'`).
+- Failed: exit code 3 with 63 methods not decompiled, including the animation file builder; names are obfuscated by R8 so greps for plain names often fail.
+- Decision: use jadx for survey, apktool smali for failed methods (the builder's ffmpeg command string was only visible in smali), and navigate obfuscation by following constants, string literals and stored keys instead of class names.
+
+### Search strategy on a big tree (ripgrep and grep)
+- Why: finding the BLE stack, constants and writers across 10k files.
+- Worked: grep for UUID strings, `getOutputStream`, `Socket`, `new byte[]{0,`, `@SerializedName`; trace each stored key (MMKV keys) to every reader and writer.
+- Failed: whole-tree recursive grep sometimes neared the shell time limit; names of models barely occur in code.
+- Decision: wrap in `timeout`, narrow to likely packages after the first hit, and treat product identity as server data.
+
+### bleak, Pillow, ffmpeg, pytest (client stack)
+- Why: bleak is the cross-platform Python BLE library (asyncio, Linux BlueZ, macOS, Windows); Pillow for stills, circular mask, text and GIF frames; ffmpeg because the documented animation builder shells out to it with an MJPEG AVI command; pytest for fast tests with no hardware.
+- Probe: installed into a venv; imported each; `ffmpeg -version` check at runtime with a clear error and tests that skip when absent.
+- Worked: only `link.BleakLink` touches Bluetooth, everything else is pure and testable.
+- Failed: scan on a machine without BlueZ raised a bare errno (now a clear message); Pillow merged identical GIF frames in a test (use distinct frames).
+- Decision: keep Bluetooth behind an abstract Link, keep every uncertain number a named constant or CLI flag.
+
+### objdump, radare2, Ghidra, capstone, pyelftools
+- Why: the Jieli authentication lives in `libjl_auth.so` (aarch64) and a CRC in `libjl_crc.so`; the file transfer cannot start without them.
+- Probe: `objdump` on the box is x86 only; Ghidra and radare2 were not available without sudo and a large install, so they were not used.
+- Worked: capstone plus pyelftools in the venv disassembled both libraries (the CRC is a 72-byte function; the auth is E1 on SAFER+).
+- Failed: no aarch64 objdump (problem log 17).
+- Decision: a pip-installable disassembler is enough for small libraries; only reach for Ghidra when the function is too large to read.
+
+### unicorn (CPU emulation of libjl_auth)
+- Why: a hand port of a cipher is easy to get subtly wrong and there is no device to run the library on; emulating the real function gives ground truth vectors.
+- Probe: map the library PT_LOAD segments, set up stack, TPIDR_EL0 page (stack canary), enable FP/SIMD, hook the PLT stubs for malloc and free, call the exported function with chosen inputs.
+- Worked: random-input comparison stage by stage against the Python port until all stages matched; vectors now in tests/test_jl_auth.py.
+- Failed: first run returned all zeros (hook returned to lr-4 instead of lr; FP/SIMD disabled).
+- Decision: always verify a port against the real code on random inputs, and commit the vectors (not the library).
+
+### Software badges (sim.py) and dry-run
+- Why: no hardware, so the only way to find client state-machine bugs is a second implementation of the badge side written from the spec.
+- Probe: write the simulator from the documented bytes, run the real session code against it, then expose the same pairing as `--dry-run`.
+- Worked: found a wrong LTV length in the simulator that stalled a transfer; the Wi-Fi badge also serves a real loopback TCP socket in a test.
+- Failed: a simulator shares the author's misreadings, so it proves consistency, not truth.
+- Decision: label everything untested on hardware, and use the first-session checklist to replace assumptions with captures.
+
+### Web reconnaissance
+- Why: the APK does not contain product identity (server data) and cannot say which service a given model exposes.
+- Probe: product pages, vendor spec page, teardown-style articles, FCC listings, forum and repository reports of the same hardware; WebSearch then WebFetch, with curl as fallback for blocked pages.
+- Worked: third-party reports of Niji and Nano showing only service 0x01F0, the black screen for type 6, the `E-badge` advertised name, Jieli BR28 class chip.
+- Failed: results are second-hand and sometimes marketing; no direct Pulse capture found.
+- Decision: tag web facts Inferred, change client defaults only when a report is specific and consistent with the code (stills as type 5), and keep the old behaviour behind a flag.
+
+### Wi-Fi analysis path
+- Why: a second transport (TCP 8080, live camera) existed only as constants; it matters for live streaming.
+- Probe: grep constants, find the single writer, enumerate callers for the command list, read the reader loop for replies, read the camera analyzer for limits (see 12.2).
+- Worked: full control-word table, frame format, 300 ms spacing, upload request text, all from code; software Wi-Fi badge and `stream` command.
+- Failed: the sender was hidden in misnamed obfuscated classes; the first doc draft misstated a header read through a truncated line (problem 35).
+- Decision: Wi-Fi is selected by server product type, so the client takes `--transport wifi`; whether any given model has Wi-Fi is left to the first session.
+
+### Reuse notes for another app
+1. Order: manifest and permissions, then UUID or port constants, then the single write path, then reply parsing, then containers and checksums, then auth, then client, then simulator, then hardware.
+2. Mark every claim Confirmed, Inferred or Unknown the moment you write it; fix claims by reading the full source line, not a truncated one.
+3. Keep a problem log from the first minute; most entries became SOP steps.

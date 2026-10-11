@@ -11,7 +11,7 @@ Show a live feed (screen, camera, canvas or video) from the phone on the 360x360
 3. The badge supports DLE, 2M PHY and short connection intervals. Verify with PHY and interval callbacks and a throughput test.
 4. The badge can accept a new file while showing the previous one, and can replace a file of the same name without a long pause.
 5. The nn20 path's ACK frames can be used as credits (only if the badge is an nn20-family device).
-6. Whether any Wi-Fi interface exists on the badge (look at the advertised services, the info reply function bytes, and whether a SoftAP appears).
+6. Whether any Wi-Fi interface exists on the badge (look at the advertised services, the info reply function bytes, and whether a SoftAP appears). The app already has a Wi-Fi live camera path for products the server marks WiFi (docs/wifi-protocol.md); see the appendix for fps and bandwidth.
 
 ## Phone app architecture
 - Layers: capture (screen, camera, canvas) -> frame scheduler -> encoder -> packetiser -> link driver -> badge.
@@ -79,7 +79,7 @@ Show a live feed (screen, camera, canvas or video) from the phone on the 360x360
 1. Rapid still updates (1 to 2 fps) with small JPEGs.
 2. Short looping clips refreshed every few seconds (near-live).
 3. Pre-render animations on the phone and upload once, driving content changes (clock, weather, status) rather than video.
-4. Wi-Fi SoftAP transport only for models that have it (nn20 sibling product: 192.168.8.1:8080).
+4. Wi-Fi SoftAP transport only for models that have it: TCP 192.168.8.1:8080, implemented as `rebeambox stream` and `--transport wifi` (docs/wifi-protocol.md).
 5. Custom firmware as a last resort, after Phase 0 to 4 evidence and with a recovery plan.
 
 

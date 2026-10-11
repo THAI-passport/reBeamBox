@@ -6,7 +6,7 @@ Notes from the manifest and decompiled code. No app source or assets are reprodu
 Companion app for round-screen electronic badges. It sends photos, videos and GIFs to the badge over BLE, with a community, account system and AI image generation around it. Main package: com.example.nn20 (shared with sibling apps by the same vendor). Launcher activity: SplashActivity, then MainActivity.
 
 ## Screens and features (by activity)
-- Device connection: BluetoothDeviceActivity, PollyConectDeviceActivity, WiFiDeviceActivity, WifiScanActivity (a Wi-Fi path also exists, not studied), DeviceRegulatingctivity (device settings such as brightness).
+- Device connection: BluetoothDeviceActivity, PollyConectDeviceActivity, WiFiDeviceActivity, WifiScanActivity (the Wi-Fi path is documented in docs/wifi-protocol.md), DeviceRegulatingctivity (device settings such as brightness).
 - Media selection and editing: GalleryActivity, CameraActivity, CameraStreamActivity, CropImageActivity (circular crop), VideoCropActivity, VideoGifActivity, MultiImageCarouselActivity, SingleAddActivity, DoodleCanvasActivity, StickerLibraryActivity(2), FilmCoatingLibraryActivity, BigPictureActivity.
 - AI and creative: AiCreateActivity, AiMyCreationActivity, TravelPostcardActivity, TravelPostcardVideoActivity, DanmakuUploadActivity.
 - Community: MomentsActivity, PublishActivity, OtherDynamicActivity, ArtworkDetailActivity, CommentDetailActivity, MyFriendsActivity, HistoryActivity.

@@ -37,7 +37,7 @@ Tags: [C] confirmed from the decompiled app (Beambox+ 1.0.14), [W] reported by a
 - The badge only advertises while its pairing screen (QR code, "Scan to download") is shown; the advertised name is `E-badge` in pairing mode [W]. A third-party report also saw `Nikko-badge(BLE)` on a Nano powered over USB, which the app's own filter would hide because of the BLE suffix [W]. The client accepts `E-badge`, and `--model` adds the model name and bypasses the BLE-suffix rule.
 - Status JSON pushed on 0x01F2 (from a Niji) [W]: `{"type":13,"allspace":16384,"freespace":5592,"devname":"","size":"368,368","time_mode":1,"brand":0}`. `size` is a string "W,H"; allspace and freespace are KB. The client now reads `size`.
 - Reported packet size 496 data bytes works on a Niji [W]; the app constant is 446 [C]; the client keeps 446.
-- Wi-Fi path: not implemented. Code facts [C]: 360 px images, join the badge access point first, TCP to 192.168.8.1:8080 for camera frames. See docs/pulse.md and docs/streaming-plan.md.
+- Wi-Fi path: selected by the server product `deviceType = WiFi`, never by model name. Full analysis in docs/wifi-protocol.md; the client implements it (`--transport wifi`, `stream`). Which of the three models (if any) the server marks WiFi is [U].
 
 ## 6. Web recon (all [W])
 - Spec page https://beambox.my/index.php?option=com_sppagebuilder&view=page&id=94 : taglines and feature bullets as in the table (NIKKO: four wearing styles, standard display; NANO: location support, longest standby, pin or keychain; NIJI: 1.53 inch touch, GIF, high capacity battery, up to 12 hours).

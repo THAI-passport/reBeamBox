@@ -111,11 +111,22 @@ Method used (what worked):
 8. Tag every statement Confirmed, Inferred or Speculative.
 Outputs: docs/PROTOCOL.md, docs/app-behaviour.md, docs/binaries.md, and docs/hardware-prediction.md and docs/streaming-plan.md for design work.
 
+### 11.1 Native-library recovery by emulation (worked for libjl_auth.so)
+1. List symbols and sections with pyelftools; `.dynsym` names (function_E1test, function_E21) and the JNI strings in `.rodata` (class and method names) tell you the surface. `.rela.plt` order maps PLT stubs to libc imports (malloc, free, rand).
+2. Disassemble `.text` with capstone to a file; read JNI_OnLoad to find the RegisterNatives table in `.data` (name, signature, function pointer), then each native.
+3. Constants in `.data` and tables in `.rodata` are the secrets; compare tables against textbook ones (here SAFER+ exp, log and bias tables) before assuming custom crypto.
+4. Do not trust a hand port: run the real function with unicorn (pip install unicorn). Map PT_LOAD segments at their vaddr, give TPIDR_EL0 a mapped page (stack canary), enable FP/SIMD via CPACR_EL1, hook the PLT stubs for malloc and free, set PC to the link register to return from a hook (not LR minus 4). Script: tools/emulate_jl_auth.py.
+5. Port stage by stage (key schedule, block cipher, wrapper) and compare each stage with the emulator on random inputs; freeze the emulator outputs as test vectors (tests/test_jl_auth.py).
+6. Do not commit the .so; commit only the emulation script and vectors.
+
+### 11.2 Reading an SDK's command layer (worked for Jieli RCSP)
+Read in this order: frame packer/parser (ParseHelper, BasePacketParse), command classes (opcode in the super constructor, param toData/parse), response handlers (cmdHandler classes switch on opcode), then the task that sequences them (TransferTask). Types in the base classes decide the "wants response" flag. Write pure-function builders (rebeambox/rcsp.py) and unit tests with frames derived by hand.
+
 ## 12. Phase: build the client
-TODO (not started). Plan: docs/streaming-plan.md. Planned: Python client with bleak and Pillow, scan and connect, image and GIF conversion to 360x360, chunked writes with flow control, CLI. Icons only (Lucide) in any UI, no emoji.
+In progress. Reference modules so far: rebeambox/jl_auth.py (auth), rebeambox/rcsp.py (RCSP frames and transfer payloads). Plan: docs/streaming-plan.md. Planned: Python client with bleak and Pillow, scan and connect, image and GIF conversion to 360x360, chunked writes with flow control, CLI. Icons only (Lucide) in any UI, no emoji.
 
 ## 13. Phase: tests
-TODO. Planned: pytest unit tests for packet serialization, checksum, chunking, and frame conversion; golden vectors derived from the spec; no hardware required.
+Started: tests/test_jl_auth.py and tests/test_rcsp.py (run `.venv/bin/python -m pytest tests`). Planned: pytest unit tests for packet serialization, checksum, chunking, and frame conversion; golden vectors derived from the spec; no hardware required.
 
 ## 14. Reporting checklist
 - Update docs/problem_solution.md with any new problem

@@ -165,3 +165,30 @@ Entry format: date, phase, problem, cause, solution (or Status: Unsolved plus wh
 - Phase: Native analysis
 - Problem: mawk lacks strtonum, so address-range filtering of the disassembly failed.
 - Solution: Used a small Python filter. Status: Solved.
+
+## 24. Earlier doc showed the RCSP file name as UTF-16 and 0xDB as ten values
+- Date: 2026-10-11
+- Phase: Spec review
+- Problem: The first PROTOCOL.md draft marked the name encoding as inferred (UTF-16LE) and described 0xDB as ten u16; both were wrong.
+- Cause: Written before TransferTask, LargeFileTransferGetNameCmd and the receive parser (se/b.java) were read in full.
+- Solution: Reading them showed the StartLargeFileTransfer path is a plain ASCII temp name with NUL, UTF-16LE (prefixed with a backslash-U marker) is only used in the GetName reply for long names, and 0xDB carries twelve u16 values (ten mandatory). Spec and rebeambox/rcsp.py fixed. Status: Solved.
+
+## 25. Bind reply layout partly uncertain
+- Date: 2026-10-11
+- Phase: Spec
+- Problem: The 0x61 parser in se/b.java decompiled with merged branches (shared offset variable), so offsets for protocol >= 26 are only moderately certain.
+- Cause: jadx variable merging in a very long method (2098 lines).
+- Solution: Documented the table with a caveat; Status: Unsolved at byte level until a real reply is seen or the smali is read. The field is not needed to upload.
+
+## 26. Transport for Beambox+ cannot be proven from the APK
+- Date: 2026-10-11
+- Phase: Spec
+- Problem: Which BLE name the Beambox+ advertises is decided by a server-delivered product list (signal name field), plus hard-coded NEO and B-Device.
+- Cause: No local product table in assets, resources or code.
+- Solution: Documented the runtime selection rule so a client can follow it (name test, then service discovery). Status: Unsolved without a badge or a capture; no network calls to the vendor backend were made (code-only scope).
+
+## 27. Slow broad grep over the decompiled tree
+- Date: 2026-10-11
+- Phase: Spec
+- Problem: A recursive grep with a multi-name find hung a shell for 30 s.
+- Solution: Narrow directories and use timeout. Status: Solved.

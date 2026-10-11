@@ -328,3 +328,11 @@ Entry format: date, phase, problem, cause, solution (or Status: Unsolved plus wh
 - Problem: A naive host-ban lint would flag the lint's own host list and its tests.
 - Cause: The rule needs the strings it forbids.
 - Solution: the lint script and its test are exempt from the host rules only (emoji still checked); code files additionally fail on any non-local URL. The repository currently contains no analytics host anywhere.
+
+
+## 47. Push rejected: token lacks the workflow scope
+- Date: 2026-10-11
+- Phase: CI
+- Problem: `git push` was refused: an OAuth App cannot create or update `.github/workflows/ci.yml` without the `workflow` scope.
+- Cause: The stored GitHub credential has no `workflow` scope.
+- Solution: Not worked around (no token handling). The unpushed local commits were rewritten so the workflow sits at `ci/ci.yml`, everything else was pushed. Status: Unsolved for activation; the owner must either grant the `workflow` scope (`gh auth refresh -s workflow`) and `git mv ci/ci.yml .github/workflows/ci.yml`, or add the file in the GitHub web UI.

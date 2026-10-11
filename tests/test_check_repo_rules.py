@@ -101,8 +101,17 @@ def test_cli_exit_codes_and_output(tmp_path, capsys):
     assert "docs/b.md:2: emoji: U+1F600" in out and "1 violation" in out
 
 
+def _read_ci():
+    """The workflow lives in .github/workflows/ci.yml; it is staged in ci/ci.yml until the push token has the workflow scope."""
+    for rel in ((".github", "workflows", "ci.yml"), ("ci", "ci.yml")):
+        p = os.path.join(ROOT, *rel)
+        if os.path.exists(p):
+            return open(p).read()
+    raise AssertionError("no CI workflow file found")
+
+
 def test_ci_workflow_has_required_steps():
-    text = open(os.path.join(ROOT, ".github", "workflows", "ci.yml")).read()
+    text = _read_ci()
     for needle in ('branches: [main]', "pull_request:", 'python-version: ["3.10", "3.11", "3.12"]', "actions/setup-node",
                    'pip install -e ".[dev]"', "pytest -q", "tests/test_no_vendor_calls.py", "tools/check_repo_rules.py",
                    "tools/make_fixtures.py --check"):

@@ -138,3 +138,10 @@ Entry format: date, phase, problem, cause, solution (or Status: Unsolved plus wh
 - Problem: Both the nn20 (0x01F0) and BadgeSdk (NEO / B-Device) paths exist; static analysis cannot show which one a Beambox+ unit speaks.
 - Cause: Selection depends on the advertised name at runtime.
 - Solution: Status: Unsolved. Evidence favours the BadgeSdk path. Needs a scan of a real unit or an HCI capture (streaming-plan.md phase 0).
+
+## 20. SOP section 11 accidentally deleted by a splice
+- Date: 2026-10-11
+- Phase: Documentation
+- Problem: When filling SOP section 10 earlier, the replacement text spliced from section 9 up to "## 12", which silently removed the old section 11 placeholder. A later edit that looked for section 11 failed with "substring not found" and left some files committed before the SOP.
+- Cause: Slice boundaries in a Python edit script spanned two sections.
+- Solution: Re-inserted section 11 with the real tracing method and re-committed. Lesson: splice between adjacent headers only, and verify headings with grep afterwards. Status: Solved.

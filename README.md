@@ -68,6 +68,7 @@ cd ui && python3 -m http.server 8000                             # Web Bluetooth
 ```
 - `probe --qualify` writes nothing to the badge storage: nn20 badges are only listened to (status JSON on 0x01F2), BadgeSdk badges get the read-only info query 0xC6. The report follows the results template of docs/hardware-test-v1.md; Bluetooth addresses are masked unless `--no-redact`. Reports are git-ignored.
 - Packet size follows the negotiated MTU: P = min(446, mtu - 12), ATT minimum 23. No-ACK streaming falls back to ACK batches (and a reconnect if the link dropped) when the badge reports a failed packet or a write errors.
+- Safe-write policy: every real upload is counted per badge, an identical payload is skipped, writes closer than 30 s are refused, and high counts warn (`--force`, `--no-delta`, `--min-interval-s`, `--warn-per-day`, `--warn-total`; `rebeambox uploads` shows the counter). See docs/safe-write.md.
 - nn20 stills default to a one-frame type 5 container (interval 3000 ms); `--nn20-still album` sends type 6. Stills are cropped with a circular mask on black at the size the badge reports (360 or 368).
 - Details: ui/README.md, tools/replay_pcap.py header, docs/hardware-test-v1.md.
 
@@ -106,4 +107,5 @@ python -m pytest -q                  # no hardware (250 pass, 1 skip); see docs/
 Not affiliated with the badge vendor. The original app and its assets are not included or modified.
 
 - [Hardware recon checklist](docs/hardware-recon-checklist.md)
+- [Safe-write policy (flash protection, upload counter)](docs/safe-write.md)
 - [Web reconnaissance (FCC, teardowns, retail, related projects)](docs/recon-web.md)

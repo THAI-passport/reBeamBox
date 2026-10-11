@@ -42,10 +42,14 @@ def wifi_payload(job, size=wifi.WIFI_SIZE, still_mode="imb"):
 
 
 async def send_wifi(job, open_channel, host=wifi.HOST, port=wifi.PORT, size=None, still_mode="imb", log=print,
-                    progress=None, pace=True):
+                    progress=None, pace=True, gate=None):
     data = wifi_payload(job, size or wifi.WIFI_SIZE, still_mode)
+    if gate:
+        gate.check(data)                  # may raise safewrite.Skipped or safewrite.Blocked
     s = wifi.WifiSession(open_channel, host, port, log, pace)
     await s.send_file(data, progress=progress)
+    if gate:
+        gate.commit(data)
     return data
 
 
@@ -58,7 +62,7 @@ def detect_transport(link):
 
 
 async def send(link, job, transport=None, size_override=None, log=print, progress=None,
-               fast=False, animation_type=1, packet_interval_ms=20, ack_batch_size=4):
+               fast=False, animation_type=1, packet_interval_ms=20, ack_batch_size=4, gate=None):
     """Send a Job over a connected Link. Returns the exact payload file bytes that were transferred."""
     transport = transport or detect_transport(link)
     log("transport: %s" % transport)
@@ -68,7 +72,11 @@ async def send(link, job, transport=None, size_override=None, log=print, progres
         size = size_override or s.picture_size()
         log("badge picture size %d, memory %s KB" % (size, s.info["memory_kb"] if s.info else "?"))
         data, is_avi, name = job.badge_payload(size)
+        if gate:
+            gate.check(data)
         await s.send_media(data, is_avi, name, progress)
+        if gate:
+            gate.commit(data)
         return data
     s = Nn20Session(link, log, guard_scale=0.0 if fast else 1.0, interval=0.0 if fast else packet_interval_ms / 1000.0,
                     ack_batch=ack_batch_size)
@@ -79,5 +87,9 @@ async def send(link, job, transport=None, size_override=None, log=print, progres
     except ValueError:
         pass
     type_, payload = job.nn20_payload(size_override or reported or 368)
+    if gate:
+        gate.check(payload)
     await s.send(type_, payload, animation_type if job.kind != "still" else None, progress)
+    if gate:
+        gate.commit(payload)
     return payload

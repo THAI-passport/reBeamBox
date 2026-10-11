@@ -373,3 +373,11 @@ Entry format: date, phase, problem, cause, solution (or Status: Unsolved plus wh
 - Problem: The checklist names `2BR3T-BADGE0` and `2BR3T-BAGDE0`; one returned 404. A search summary also quoted "1.28-inch LED display" for Pulse, conflicting with Nikko's 1.83 inch IPS.
 - Cause: The grant itself spells the product code "BAGDE0" ("E-Bagde"); marketing copy on resale pages is loose.
 - Solution: Verified on the registry page, kept both spellings noted, labelled retail claims W, flagged Pulse panel size as unresolved in docs/recon-web.md and asked H1 to record the physical diagonal. Third-party blog contents are W, not Confirmed.
+
+
+## 53. Safe-write check needs the payload, which needs the connection
+- Date: 2026-10-11
+- Phase: safe-write policy
+- Problem: Delta skipping needs the hash of the payload, but the payload depends on the picture size the badge reports, so it cannot be computed before connecting.
+- Cause: Pictures are rendered at the size the badge advertises (368 versus 360).
+- Solution: The gate runs inside `client.send` after the handshake and before the first data frame; a skipped upload writes nothing to flash (only the handshake traffic happened). The counter is advanced after success only. Documented in docs/safe-write.md.

@@ -3,7 +3,7 @@ import argparse
 import asyncio
 import sys
 
-from . import __version__, client, link, media, models, scan as scanmod, sim, wifi
+from . import __version__, client, link, media, models, safewrite, scan as scanmod, sim, wifi
 
 
 def _add_common(p):
@@ -23,7 +23,23 @@ def _add_common(p):
     p.add_argument("--nn20-still", choices=["gif", "album"], help="nn20 stills: gif = type 5 one-frame container (default), album = type 6 IMB")
     p.add_argument("--packet-interval-ms", type=float, default=20.0, help="nn20 gap between packets in ms (default 20)")
     p.add_argument("--ack-batch-size", type=int, default=4, help="nn20 ACK mode: packets per batch (default 4, falls back to 1 after errors)")
+    g = p.add_argument_group("safe-write policy (flash protection, docs/safe-write.md; not applied to --dry-run)")
+    g.add_argument("--min-interval-s", type=float, default=safewrite.DEFAULT_MIN_INTERVAL_S, help="minimum seconds between writes to one badge (default 30)")
+    g.add_argument("--warn-per-day", type=int, default=safewrite.DEFAULT_WARN_PER_DAY, help="warn above this many writes in 24 h (default 100, 0 = off)")
+    g.add_argument("--warn-total", type=int, default=safewrite.DEFAULT_WARN_TOTAL, help="warn above this many writes per badge (default 10000, 0 = off)")
+    g.add_argument("--force", action="store_true", help="ignore the minimum interval and the unchanged-image skip")
+    g.add_argument("--no-delta", action="store_true", help="do not skip an upload identical to the last one")
+    g.add_argument("--no-safe-write", action="store_true", help="turn the whole policy off (no counting either)")
+    g.add_argument("--badge-id", help="name the badge for the counter (default: its address, or the Wi-Fi host)")
+    g.add_argument("--state-dir", help="where the counter file lives (default ~/.local/state/rebeambox or $REBEAMBOX_STATE_DIR)")
     p.add_argument("--quiet", action="store_true")
+
+
+def make_gate(args, badge_id, log):
+    if args.dry_run or args.no_safe_write:
+        return None
+    pol = safewrite.Policy(True, args.force, not args.no_delta, args.min_interval_s, args.warn_per_day, args.warn_total)
+    return safewrite.Gate(args.badge_id or badge_id, pol, safewrite.Store(args.state_dir), log=log)
 
 
 def build_parser():
@@ -43,6 +59,8 @@ def build_parser():
     p.add_argument("--report-dir", default="reports"); p.add_argument("--no-redact", action="store_true", help="keep the full Bluetooth address in the report")
     p.add_argument("--no-wifi-check", action="store_true"); p.add_argument("--wait", type=float, default=3.0, help="seconds to wait for the handshake reply")
     p.add_argument("--simulate", choices=["nn20", "badge"], help="run against a software badge (no Bluetooth)")
+    p = sub.add_parser("uploads", help="show or reset the local upload counter used by the safe-write policy")
+    p.add_argument("--state-dir"); p.add_argument("--reset", action="store_true", help="forget all counts and hashes")
     p = sub.add_parser("send-image", help="send a JPG/PNG still"); p.add_argument("path"); _add_common(p)
     p.add_argument("--quality", type=int, default=90)
     p = sub.add_parser("send-gif", help="send an animated GIF"); p.add_argument("path"); _add_common(p)
@@ -144,7 +162,8 @@ async def _run_wifi(args, log):
         payload = b"".join(frames)
     else:
         payload = await client.send_wifi(make_job(args), mk, args.host, args.port, args.size, args.wifi_still, log,
-                                         None if args.quiet else (lambda p: print("\r%3d%%" % p, end="", file=sys.stderr)), pace)
+                                         None if args.quiet else (lambda p: print("\r%3d%%" % p, end="", file=sys.stderr)), pace,
+                                         gate=make_gate(args, "wifi:%s:%s" % (args.host, args.port), log))
     if args.dry_run:
         _wifi_dump(args.dry_run, events, payload)
         log("wrote %d events to %s (payload %d bytes in %s.payload)" % (len(events), args.dry_run, len(payload), args.dry_run))
@@ -182,12 +201,13 @@ async def _run_send(args):
             return 2
         addr = found[0]["address"]
         log("using %s (%s)" % (found[0]["name"], addr))
+    gate = make_gate(args, addr, log)
     lk = link.BleakLink(addr)
     await lk.connect()
     try:
         await client.send(lk, job, args.transport, args.size, log, progress=None if args.quiet else
                           (lambda p: print("\r%3d%%" % p, end="", file=sys.stderr)),
-                          packet_interval_ms=args.packet_interval_ms, ack_batch_size=args.ack_batch_size)
+                          packet_interval_ms=args.packet_interval_ms, ack_batch_size=args.ack_batch_size, gate=gate)
         log("\ndone")
     finally:
         await lk.close()
@@ -227,7 +247,20 @@ def main(argv=None):
             if args.json:
                 open(args.json, "w").write(text)
             return 0
+        if args.cmd == "uploads":
+            st = safewrite.Store(args.state_dir)
+            if args.reset:
+                st.reset()
+                print("upload counter cleared")
+            print(safewrite.report(st))
+            return 0
         return asyncio.run(_run_send(args))
+    except safewrite.Skipped as e:
+        print("skipped: %s (use --force to write anyway)" % e, file=sys.stderr)
+        return 0
+    except safewrite.Blocked as e:
+        print("not sent: %s" % e, file=sys.stderr)
+        return 2
     except media.MediaError as e:
         print("error: %s" % e, file=sys.stderr)
         return 1

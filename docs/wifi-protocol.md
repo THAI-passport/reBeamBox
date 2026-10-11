@@ -71,7 +71,7 @@ Only models whose server record has `deviceType = WiFi` take this path; see sect
 
 ## 8. What rebeambox does
 - `rebeambox send-image|send-gif|send-video|send-text --transport wifi [--host IP] [--port N] [--wifi-still imb|gif]`
-- `rebeambox stream <video-or-gif> [--fps 2]` (live frames, clamped to 3.3 fps, each JPEG fitted under 30720 bytes).
+- `rebeambox stream <video-or-gif> [--fps 2]` (live frames, clamped to 3.3 fps, each JPEG fitted under 30720 bytes; a frame above that is dropped and counted, unlike the app which only logs a warning).
 - `--dry-run FILE` runs against a software badge (`SimWifiBadge`) and writes every write and reply plus the payload; no network.
 - Tests: framing, header text, free-space parsing, refusal, no space, camera loop with a shutter event, loopback TCP server using the same software badge.
 - Untested on hardware. Everything above not marked [C] is a hypothesis.

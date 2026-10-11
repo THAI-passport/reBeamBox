@@ -142,6 +142,7 @@ class WifiSession:
         """open_channel(name) -> Channel (not yet opened)."""
         self._mk, self.host, self.port, self.log, self.pace = open_channel, host, port, log, pace
         self.shots = 0
+        self.dropped = 0
 
     async def _open(self, name):
         ch = self._mk(name)
@@ -192,8 +193,10 @@ class WifiSession:
                 raise WifiError("badge did not confirm camera mode (expected 007B)")
             n = 0
             for jpeg in frames:
-                if len(jpeg) > MAX_JPEG:
-                    self.log("warning: frame %d bytes exceeds %d" % (len(jpeg), MAX_JPEG))
+                if len(jpeg) > MAX_JPEG:       # the app only warns; the client drops (badge buffer limit is probably 30 KB)
+                    self.dropped += 1
+                    self.log("dropped frame of %d bytes (limit %d)" % (len(jpeg), MAX_JPEG))
+                    continue
                 await ctrl.send(camera_frame(jpeg))
                 n += 1
                 if progress:

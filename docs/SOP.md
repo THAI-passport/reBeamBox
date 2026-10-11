@@ -149,7 +149,7 @@ Procedure that worked, reusable for any secondary transport:
 7. For input events: enumerate the incoming command parsers and listener interfaces, not text searches for names like touch; then state the negative result with the list.
 
 ## 13. Phase: tests
-`.venv/bin/python -m pytest tests -q` (64 tests, no hardware, ffmpeg tests skip if ffmpeg is missing). Coverage: frame serialization and checksums (control, nn20, rcsp), auth vectors frozen from the native library emulation, container layouts, media conversion and the 3 s cap, session flows against the simulators (still, animation, no packet CRC, retry after a failed packet, free-space refusal, memory refusal), CLI dry run output, and the no-vendor-calls check. Pitfall: a test GIF made of near-identical frames is merged by Pillow on save; make frames visibly different.
+`.venv/bin/python -m pytest tests -q` (software test plan: docs/software-test-v1.md; hardware plan: docs/hardware-test-v1.md; earlier count 64 tests, no hardware, ffmpeg tests skip if ffmpeg is missing). Coverage: frame serialization and checksums (control, nn20, rcsp), auth vectors frozen from the native library emulation, container layouts, media conversion and the 3 s cap, session flows against the simulators (still, animation, no packet CRC, retry after a failed packet, free-space refusal, memory refusal), CLI dry run output, and the no-vendor-calls check. Pitfall: a test GIF made of near-identical frames is merged by Pillow on save; make frames visibly different.
 
 ## 14. Reporting checklist
 - Update docs/problem_solution.md with any new problem
@@ -232,6 +232,12 @@ General rule used throughout: probe a tool with a version command or a ten-secon
 - Worked: full control-word table, frame format, 300 ms spacing, upload request text, all from code; software Wi-Fi badge and `stream` command.
 - Failed: the sender was hidden in misnamed obfuscated classes; the first doc draft misstated a header read through a truncated line (problem 35).
 - Decision: Wi-Fi is selected by server product type, so the client takes `--transport wifi`; whether any given model has Wi-Fi is left to the first session.
+
+### Test planning (software tests before hardware)
+- Why: with no badge, the most valuable tests are the ones that would catch a wrong byte on the wire or a parser that loses data.
+- How: wrote the plan first (docs/software-test-v1.md: purpose, inputs, expected, location), then the tests; wrote the hardware plan (docs/hardware-test-v1.md) from the same unknowns so each software assumption has a hardware check.
+- Techniques that fit this kind of project: independent parsers in the test (round trip against the builder), boundary values at every length field, snapshot hashes over fixed inputs (embed a fixed JPEG instead of encoding one so the lock survives library upgrades), seeded random loops as property tests when hypothesis is not installed, ground-truth emulation for crypto behind a slow marker, and skip-by-design for tests that need external files, fonts or ffmpeg.
+- Decision: a test that documents a known ambiguity (the 127-byte frame) is kept and named after the problem log entry.
 
 ### Reuse notes for another app
 1. Order: manifest and permissions, then UUID or port constants, then the single write path, then reply parsing, then containers and checksums, then auth, then client, then simulator, then hardware.

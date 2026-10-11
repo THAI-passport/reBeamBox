@@ -263,3 +263,17 @@ Entry format: date, phase, problem, cause, solution (or Status: Unsolved plus wh
 - Cause: The protocol has no type byte.
 - Solution: Sim treats 0x007F as stop (a real JPEG is never 127 bytes). Real badge behaviour is unknown [U]; noted here so a capture can check how the firmware disambiguates.
 
+## 38. Writing tests without being allowed to run pytest
+- Date: 2026-10-11
+- Phase: software tests v1
+- Problem: The new test files had to be written and committed without a pytest run, so assertion mistakes could not be found by execution.
+- Cause: The run needs the user's approval.
+- Solution: Compiled every file with `py_compile`, re-read each assertion against the module code, and executed only the locked golden values (fixture, hashes, header hex) as plain expressions to be sure the snapshot constants are right. Removed a timing race I noticed in my own first shutter test (sleep-based) by driving the shutter from the frame generator. Status: Unverified by pytest until the run is approved; any failure should be added here.
+
+## 39. App only warns about oversize Wi-Fi frames, client now drops them
+- Date: 2026-10-11
+- Phase: software tests v1
+- Problem: The test plan requires oversize Wi-Fi frames to be dropped, but the client logged a warning and sent them (copying the app).
+- Cause: Followed the app literally; the 30720-byte limit is a likely badge buffer size, so sending more is risky.
+- Solution: `WifiSession.stream` drops frames above 30720 bytes and counts them in `dropped`; documented in wifi-protocol.md and software-test-v1.md.
+

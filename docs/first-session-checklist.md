@@ -1,6 +1,6 @@
 # First session with a real badge
 
-Goal: in one sitting, find out which transport the badge uses, whether the documented bytes work, and capture enough evidence to fix the client afterwards. Nothing here needs the vendor app except step 1 (capture). Related: PROTOCOL.md, models.md, wifi-protocol.md, problem_solution.md.
+Goal: in one sitting, find out which transport the badge uses, whether the documented bytes work, and capture enough evidence to fix the client afterwards. Nothing here needs the vendor app except step 1 (capture). Related: PROTOCOL.md, models.md, wifi-protocol.md, problem_solution.md. Run the software tests first (software-test-v1.md), then use hardware-test-v1.md for the structured tests (H1 to H7) after this checklist.
 
 Rules: write down every command you run and its output. A failure with a log is more useful than a success without one. Never share your Wi-Fi password or full Bluetooth addresses publicly; redact the last 3 bytes.
 

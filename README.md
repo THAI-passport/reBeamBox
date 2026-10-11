@@ -60,12 +60,14 @@ Transport is chosen by service discovery: control service C2E6FD00 plus Jieli 0x
 
 ## Tests
 ```
-python -m pytest tests -q            # 64 tests, no hardware
+python -m pytest tests -q            # no hardware; see docs/software-test-v1.md (larger auth fuzz: -m slow)
 ```
 
 ## Docs
 - docs/PROTOCOL.md: byte-exact protocol, with Confirmed/Inferred tags
 - docs/wifi-protocol.md: Wi-Fi access point path, control words, live camera frames, upload
+- docs/software-test-v1.md: the software test plan (what each test checks and where it lives)
+- docs/hardware-test-v1.md: tests to run with a real badge, with pass/fail criteria and a results template
 - docs/first-session-checklist.md: what to capture and report on the first real badge test
 - docs/models.md: NIKKO, NANO, NIJI comparison, transport per model, web recon
 - docs/pulse.md: Pulse-specific findings and how the client handles them

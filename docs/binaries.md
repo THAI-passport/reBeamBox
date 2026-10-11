@@ -27,3 +27,11 @@ The base APK contains no .so files; all native code is in the arm64 split (ABI a
 | libc++_shared | 1.8 MB | C++ runtime |
 
 No native library implements the BLE image protocol as far as seen; checksum and framing are in Java. Jieli libraries (libjl_crc, libjl_pack_format) may matter for firmware or OTA and are not yet analysed.
+
+## Update: findings per library (second pass)
+- libjl_crc.so (5.4 KB): single function CRC16(buf, len, seed); nibble-table CRC-16/XMODEM (poly 0x1021, no reflection), table of 16 values at .rodata 0x5e0. Verified check value 0x31C3. Used for the Jieli file transfer CRC. Confirmed by disassembly with capstone.
+- libjl_auth.so (11.5 KB) and libjl_ota_auth.so (15 KB): Jieli authentication ciphers for the RCSP link and OTA. Not disassembled yet; needed for the BadgeSdk path (see problem_solution.md entry 18).
+- libjl_fatfs.so (346 KB) and libjl_pack_format.so (282 KB): FAT and package formatting used by the Jieli watch and file tooling; supports the theory that the badge stores media in a FAT volume.
+- FFmpeg libraries and libffmpegkit: used to build the AVI (MJPEG) files for animations and to extract frames from videos. They do not handle BLE.
+- No library implements the nn20 framing or checksum; those are Java.
+- The base APK contains no native code; classes live in classes.dex and classes2.dex; the BadgeSdk is package com.zijun.badgesdk and its helper classes are obfuscated (te, re, se, qe, f8).

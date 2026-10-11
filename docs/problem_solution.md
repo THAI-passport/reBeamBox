@@ -67,7 +67,7 @@ Entry format: date, phase, problem, cause, solution (or Status: Unsolved plus wh
 - Phase: Decompile
 - Problem: jadx finished with "finished with errors, count: 63" and exit code 3. Some methods, including the animation file builder (`BadgeMediaFileBuilder.a`), were emitted as stubs with a type-inference error ("Types fix failed").
 - Cause: jadx cannot always recover types in heavily optimised (R8) bytecode. Exit 3 only signals per-method failures, not a failed run.
-- Solution: Output is usable (10,755 files). For the failed methods, read the smali with apktool, or re-run jadx on that class with `--show-bad-code` or `--comments-level debug`. Not yet done for the animation builder. Status: Unsolved for the 63 methods (GIF container details still inferred from `BinConverter`).
+- Solution: Output is usable (10,755 files). For the failed methods, read the smali with apktool, or re-run jadx on that class with `--show-bad-code` or `--comments-level debug`. Not yet done for the animation builder. Update: `BadgeMediaFileBuilder.a` was recovered from apktool smali (it builds an MJPEG AVI with an ffmpeg command line, see PROTOCOL.md 3.6). Status: Solved for the methods that mattered; the other failed methods were not needed and remain undecompiled.
 
 ## 10. jadx progress log is unreadable
 - Date: 2026-10-11
@@ -81,7 +81,7 @@ Entry format: date, phase, problem, cause, solution (or Status: Unsolved plus wh
 - Phase: Trace protocol
 - Problem: `grep` for the notification parser method signature (`boolean b()`) in the BLE manager returned nothing, so the badge's reply layout could not be read.
 - Cause: Obfuscated names and decompiler formatting meant the guessed signature did not match. The work was also interrupted by a new request before a second search.
-- Solution: Pending. Next step: read `manager/k.java` (`onCharacteristicChanged`) and follow the call that consumes the accumulated buffer in `manager/m.java`, then confirm the 0xA0 reply layout. Status: Unsolved.
+- Solution: Pending. Next step: read `manager/k.java` (`onCharacteristicChanged`) and follow the call that consumes the accumulated buffer in `manager/m.java`, then confirm the 0xA0 reply layout. Update: solved. The parser was in `manager/k.java` (`b()`), reply frame layout documented in PROTOCOL.md 2.5. Status: Solved.
 
 ## 12. Interrupted or slow git clones
 - Date: 2026-10-11
@@ -95,4 +95,46 @@ Entry format: date, phase, problem, cause, solution (or Status: Unsolved plus wh
 - Phase: Trace protocol
 - Problem: Several protocol facts could not be established from the first static pass.
 - Cause: Obfuscated code, failed decompiles, no hardware to observe live traffic, and no packet capture tools (see entry 2).
-- Solution: Status: Unsolved. Open items, also listed in docs/PROTOCOL.md: type code for still image versus GIF (5 versus 6); layout of the badge's reply notifications; whether service 0x03C4 is another hardware revision; whether any pairing or auth handshake exists; exact GIF container over BLE and the AVI builder's role; whether the ACK batching is mandatory. Plan: finish static tracing (callers of the send function, smali for failed methods), then validate against hardware or a btsnoop capture.
+- Solution: Status: Unsolved. Open items, also listed in docs/PROTOCOL.md: type code for still image versus GIF (5 versus 6); layout of the badge's reply notifications; whether service 0x03C4 is another hardware revision; whether any pairing or auth handshake exists; exact GIF container over BLE and the AVI builder's role; whether the ACK batching is mandatory. Update after the second pass: resolved items are in PROTOCOL.md (type codes, reply layout, ACK flow, containers, checksums, handshake, name filters, 0x03C4 unused). Still open: Jieli auth algorithm, some reply fields, which path the real badge uses; these need a capture or more disassembly.
+
+## 14. Wrong assumption: one BLE protocol
+- Date: 2026-10-11
+- Phase: Trace protocol
+- Problem: The first pass assumed the 0x01F0 service was the badge protocol. Reading the upload callers showed the app has three transports and the BadgeSdk path uses entirely different framing (control service C2E6FD00 plus Jieli RCSP) and a different media format (AVI, not the IMB container).
+- Cause: The first grep for UUIDs hit the nn20 constants class first; the BadgeSdk lives in another package (com.zijun.badgesdk) and uses obfuscated helper classes (te, re, se, qe, f8).
+- Solution: Followed the connect handler (o7/t6.java) to see which path each device name takes, then documented both paths in PROTOCOL.md. Status: Solved. Lesson recorded in the SOP: always trace from the UI click to the transport before trusting the first UUID hit.
+
+## 15. Shell commands interrupted by new instructions
+- Date: 2026-10-11
+- Phase: Trace protocol
+- Problem: Two multi-grep commands were interrupted ("Shell command was interrupted by the user") when new requirements arrived, losing their output.
+- Cause: Steering messages arrived while a command ran.
+- Solution: Re-ran the commands with `timeout` and smaller scope. Status: Solved.
+
+## 16. Broad recursive greps are slow on the full tree
+- Date: 2026-10-11
+- Phase: Trace protocol
+- Problem: `grep -r` across the whole 10,000-file tree sometimes took long enough to risk the shell limit.
+- Cause: Large decompiled tree including androidx and Google libraries.
+- Solution: Restrict to vendor packages (com/example, com/zijun, te, re, se, qe, f8, o7, p7), use `timeout`, and filter with `-l` first. Status: Solved.
+
+## 17. No objdump for aarch64 and no Ghidra
+- Date: 2026-10-11
+- Phase: Native analysis
+- Problem: The box objdump is x86 only, so libjl_crc.so could not be disassembled directly.
+- Cause: No cross binutils installed and no sudo.
+- Solution: Installed `capstone` and `pyelftools` into the venv and disassembled the 72-byte CRC function; it is CRC-16/XMODEM (verified check value 0x31C3). Status: Solved for libjl_crc. Unsolved for libjl_auth (11 KB, auth cipher): not disassembled yet.
+
+## 18. Jieli RCSP authentication algorithm not recovered
+- Date: 2026-10-11
+- Phase: Trace protocol
+- Problem: The BadgeSdk file transfer needs the Jieli RCSP link, which authenticates through native code in libjl_auth.so.
+- Cause: The cipher is native and was not disassembled in this pass; the Java side only shows the challenge flow.
+- Solution: Status: Unsolved. Tried: reading RcspAuth.java (flow, timeouts, retries only). Next: disassemble libjl_auth.so with capstone or Ghidra, or capture a real handshake.
+
+## 19. Which transport the real badge uses is undecided
+- Date: 2026-10-11
+- Phase: Trace protocol
+- Problem: Both the nn20 (0x01F0) and BadgeSdk (NEO / B-Device) paths exist; static analysis cannot show which one a Beambox+ unit speaks.
+- Cause: Selection depends on the advertised name at runtime.
+- Solution: Status: Unsolved. Evidence favours the BadgeSdk path. Needs a scan of a real unit or an HCI capture (streaming-plan.md phase 0).

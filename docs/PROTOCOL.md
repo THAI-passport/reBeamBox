@@ -164,6 +164,51 @@ D. Animation container, 2 frames of the stand-in JPEG, 100 ms, 368x368, BLE (154
 5. Wrap in the `{"type":..,"data":..}` envelope, chunk by P, build frames, write packets (WRITE_NO_RESPONSE) with the pacing and ACK rules of 2.6.
 6. Wait the end-of-transfer guard time, then report success. No finish command is sent [C: none found]. The badge parses the stream by the JSON envelope and packet counters [I].
 
+
+#### Sequence diagram 2.9a: nn20 upload, no-ACK loop and fallback
+Matches `Nn20Session` in `rebeambox/session.py` (app behaviour [C]; the failure detection and fallback are client design [I]). Labels: [C] seen in app code, [I] inferred or client-only.
+
+```mermaid
+sequenceDiagram
+    participant H as Host (rebeambox)
+    participant B as Badge (service 0x01F0)
+    H->>B: subscribe notify 0x01F2
+    B-->>H: A0 status JSON (freespace, size, time_mode) [C pushed, not requested]
+    Note over H: refuse if payload + 64 KiB exceeds freespace [C]
+    opt animation only
+        H->>B: write 0x01F1 type 13 {"animation_type":n}
+        Note over H: wait 200 ms [C]
+    end
+    Note over H: envelope + chunk, P = min(446, mtu - 12) [C]
+    alt time_mode = 1 (no-ACK loop) [C]
+        loop every packet i of n
+            H->>B: write-without-response 0x01F1 frame i (F1 type n rem len data cks)
+            Note over H: wait interval (app 20 ms, client default 20 ms)
+            opt a notification arrived
+                B-->>H: A0 {"msg":"GetPacketFail"} [I what the badge sends in this mode]
+                Note over H: failure detected, stop the loop [I]
+            end
+        end
+    else time_mode = 0 (ACK mode) [C]
+        loop batches of ack_batch frames (app 4, 2, 1 adaptive)
+            H->>B: frames i .. i+k-1, interval between writes
+            B-->>H: A0 {"msg":"GetPacketSuccess"} per frame
+        end
+    end
+    opt failure in no-ACK mode, or a write raised (drop or disconnect) [I client design]
+        alt link lost
+            H->>B: reconnect, resubscribe 0x01F2 (Link.reconnect)
+        end
+        Note over H: the failure reply has no packet index, so rewind to packet 0 [I]
+        loop ACK batches from packet 0 (batch 1 after an error)
+            H->>B: frame i (first frame has remaining = n - 1: new upload [I])
+            B-->>H: GetPacketSuccess or GetPacketFail
+            Note over H: on Fail or timeout retry after 0.5, 1, 2 s, give up after 3 retries [C app, same in client]
+        end
+    end
+    Note over H: wait guard min(((n+999)//1000)*800+800, 3000) ms, no finish command [C]
+```
+
 ## 3. BadgeSdk path ("NEO" / "B-Device" names)
 
 Three layers: advertising data, a custom control channel with its own frames, and Jieli RCSP over a second GATT connection used only for the file transfer.
@@ -311,6 +356,65 @@ Note the same E1/E21/SAFER+ family also appears in `function_E21` (E21(rand, add
 7. Memory check (0xC6), file-type announce (0xDC, 0x0C, wait ACK 0xFF [0xDC, 0]), then the RCSP large-file transfer (3.7: prepare env, device extend, start, serve the device's read requests, answer GetName, handle Stop) with a 20 s no-progress watchdog.
 8. Done when the device sends Stop with reason 0; no further command seen.
 
+
+#### Sequence diagram 3.8a: BadgeSdk with RCSP (dual GATT)
+Matches `BadgeSession` and `RcspSession`. Control service C2E6FD00 and the Jieli service 0xAE00 are separate GATT links to the same address in the app [C]; the client uses one `Link` and checks that both services are present [I]. Auth bytes are raw writes on 0xAE01, not RCSP frames [C].
+
+```mermaid
+sequenceDiagram
+    participant H as Host
+    participant C as Badge control (C2E6FD00: FD02 write, FD01 and FD03 notify)
+    participant J as Badge Jieli (0xAE00: AE01 write, AE02 notify)
+    H->>C: subscribe FD01 and FD03
+    Note over H: wait 1550 ms [C]
+    H->>C: 9E bind 0x60 (device id, 12/24 h)
+    C-->>H: 0x61 bind reply, state 0 = ok [C]
+    H->>C: 0x02 time
+    H->>C: 0xC6 info query
+    C-->>H: 0xC7 screen, picture size, memory KB
+    H->>C: 0xDA picture sizes
+    C-->>H: 0xDB twelve big-endian u16
+    Note over H,J: Jieli authentication, raw bytes [C, verified by emulation of libjl_auth.so]
+    H->>J: subscribe AE02
+    H->>J: reset frame FE DC BA C0 06 00 02 00 01 EF
+    H->>J: 00 + R (16 random bytes)
+    J-->>H: 01 + E1(R)
+    Note over H: client verifies E1(R) with default key 06775f87918dd423005df1d8cf0c142b and address 112233332211
+    H->>J: 02 70 61 73 73
+    J-->>H: 00 + Rdev (16 bytes)
+    H->>J: 01 + E1(Rdev)
+    J-->>H: 02 70 61 73 73
+    Note over H,J: RCSP parameter negotiation (frames FE DC BA flag opcode len body EF)
+    H->>J: 0x03 GetTargetInfo
+    J-->>H: LTV list, MTU type 13, CRC support type 21
+    H->>J: 0x07 GetSysInfo (storage list)
+    J-->>H: storage entries, client picks online storage handle
+    H->>J: 0x21 NotifyPrepareEnv
+    opt badge reports packet CRC16 support
+        H->>J: 0x27 DeviceExtendParam (storage handle, app has CRC16)
+        J-->>H: reply, byte 1 = 1 means per-packet CRC16
+    end
+    opt animation or video (AVI) [C]
+        H->>C: 0xDC file type 0x0C
+        C-->>H: 0xFF generic ack [0xDC, 0]
+    end
+    Note over H,J: chunked large-file transfer (badge pulls)
+    H->>J: 0x1B StartLargeFile (size, CRC16 of file, temp name)
+    J-->>H: transfer MTU u16
+    loop until Stop
+        J->>H: 0x1D read request (size, offset)
+        H->>J: Data frames 0x01/0x1D, each seq + optional CRC16 + up to MTU bytes
+        opt name lookup
+            J->>H: 0x20 GetName
+            H->>J: name reply (retry counter, status 1 after the limit)
+        end
+    end
+    J->>H: 0x1C StopLargeFile reason 0 = success
+    H->>J: response frame
+    Note over H: 20 s without progress: send 0x1E cancel and abort [C]
+    Note over H,J: still images skip the 0xDC step; whether a real badge exposes 0xAE00 at all is Unknown (third parties report only 0x01F0 on NN units)
+```
+
 ## 4. Checksums summary
 | Where | Algorithm | Status |
 |-------|-----------|--------|
@@ -322,6 +426,37 @@ Note the same E1/E21/SAFER+ family also appears in `function_E21` (E21(rand, add
 
 ## 5. Wi-Fi path [C]
 Full analysis in docs/wifi-protocol.md. Summary: the badge is a SoftAP and DHCP gateway (192.168.8.1); the phone joins the SSID containing the product signal name (default `E-Badge`) and binds the process to that network. TCP port 8080 carries (a) 2-byte big-endian control words (0x0069 query storage, 0x005F end, 0x0079 start camera, 0x007B camera on, 0x007A shutter event from the badge, 0x007D photo saved, 0x007F stop, 0x0000 terminator), (b) live camera frames as `[len16][JPEG 360x360 q10, at most 30720 bytes][0000]` at most every 300 ms, and (c) a handwritten `POST /upload` with `X-Filename: NN.bin` carrying the IMB or 0x12345678 container (Wi-Fi address-list length N*16+32) in 6144-byte chunks. Selection is by the server product `deviceType` (`WiFi` vs `BT`), not by name. Client: `rebeambox --transport wifi`, `rebeambox stream`.
+
+
+#### Sequence diagram 5a: Wi-Fi live camera
+Matches `WifiSession.stream` and `docs/wifi-protocol.md` [C]. Control words are 2 bytes big endian; the frame loop spacing and the 30720 byte limit are [C]; dropping oversize frames is client behaviour.
+
+```mermaid
+sequenceDiagram
+    participant H as Host or phone
+    participant A as Badge access point (192.168.8.1)
+    H->>A: join SSID containing E-Badge (Android 10+: network specifier, bind process) [C]
+    A-->>H: DHCP lease, gateway 192.168.8.1 [C]
+    H->>A: TCP connect port 8080 (control socket)
+    H->>A: 00 79 start camera
+    A-->>H: 00 7B camera mode on [C]
+    Note over H: any other reply or silence for 5 s aborts [client]
+    loop each JPEG frame, at least 300 ms apart (3.3 fps) [C]
+        Note over H: JPEG 360x360 quality 10, at most 30720 bytes, larger frames dropped [client]
+        H->>A: len u16 big endian + JPEG + 00 00
+        opt badge shutter button
+            A-->>H: 00 7A
+            H->>A: 00 7D photo saved
+        end
+        opt badge leaves camera mode
+            A-->>H: 00 7F
+            Note over H: end the loop
+        end
+    end
+    H->>A: 00 7F 00 00 stop
+    H->>A: close socket
+    Note over H,A: a frame whose length prefix is 127 would look like the 007F stop word. The firmware disambiguation is Unknown [I]
+```
 
 ## 6. Transport selection and remaining unknowns (second code pass)
 

@@ -130,7 +130,7 @@ Entry format: date, phase, problem, cause, solution (or Status: Unsolved plus wh
 - Phase: Trace protocol
 - Problem: The BadgeSdk file transfer needs the Jieli RCSP link, which authenticates through native code in libjl_auth.so.
 - Cause: The cipher is native and was not disassembled in this pass; the Java side only shows the challenge flow.
-- Solution: Status: Unsolved. Tried: reading RcspAuth.java (flow, timeouts, retries only). Next: disassemble libjl_auth.so with capstone or Ghidra, or capture a real handshake.
+- Solution: Status: Solved (2026-10-11, second pass). Disassembled with capstone, found E1 on SAFER+, wrote rebeambox/jl_auth.py and verified it against the real native code emulated with unicorn (see entries 21-23).
 
 ## 19. Which transport the real badge uses is undecided
 - Date: 2026-10-11
@@ -145,3 +145,23 @@ Entry format: date, phase, problem, cause, solution (or Status: Unsolved plus wh
 - Problem: When filling SOP section 10 earlier, the replacement text spliced from section 9 up to "## 12", which silently removed the old section 11 placeholder. A later edit that looked for section 11 failed with "substring not found" and left some files committed before the SOP.
 - Cause: Slice boundaries in a Python edit script spanned two sections.
 - Solution: Re-inserted section 11 with the real tracing method and re-committed. Lesson: splice between adjacent headers only, and verify headings with grep afterwards. Status: Solved.
+
+## 21. First Python port of the auth cipher produced wrong output
+- Date: 2026-10-11
+- Phase: Native analysis
+- Problem: A SAFER+ plus E1 port written from the Bluetooth specification did not match the library.
+- Cause: Two details: the Ar' variant folds the input into round 3 with the xor/add pattern of the round key (I had guessed per-position add/xor sets differently), checked by brute-forcing variants against the native Ar; and the native uses a fixed per-byte offset table for the second key.
+- Solution: Compared stage by stage (key schedule, Ar, Ar', E1) against the emulated native code until all matched. Status: Solved.
+
+## 22. Emulating the native function under unicorn
+- Date: 2026-10-11
+- Phase: Native analysis
+- Problem: No objdump, Ghidra or device to run the .so; first emulation returned all zero output.
+- Cause: The PLT hook for malloc set PC to the link register minus 4, re-executing the call forever until the instruction limit; NEON needed CPACR_EL1 enabled; the TLS canary slot needed a mapped TPIDR_EL0.
+- Solution: Hook malloc and free PLT stubs, return to LR directly, enable FP/SIMD, map TLS. Status: Solved (tools/emulate_jl_auth.py).
+
+## 23. awk strtonum not available
+- Date: 2026-10-11
+- Phase: Native analysis
+- Problem: mawk lacks strtonum, so address-range filtering of the disassembly failed.
+- Solution: Used a small Python filter. Status: Solved.

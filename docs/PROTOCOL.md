@@ -235,7 +235,7 @@ Media files for this path [C]:
 ### 3.7 Jieli RCSP layer [C structure, I details]
 - Second GATT connection created by the Jieli SDK to the same address, using service 0xAE00 (write 0xAE01, notify 0xAE02) [C UUIDs]. Started right after bind succeeds; `isTransferReady` requires bind success and the Jieli link up [C].
 - RCSP frame [C]: `FE DC BA` | flag (bit7 = command, bit6 = wants response) | opcode | length (u16 big endian) | payload | `EF`. For commands the payload starts with a sequence-number byte; for responses it starts with status then sequence number [C: packSendBasePacket].
-- Authentication [C that it exists, I that this device requires it]: RcspAuth sends 16 random bytes to the badge and verifies the badge's encrypted answer, then answers the badge's challenge; the cipher is in the native library libjl_auth.so (11 KB), 3 s timeout, 2 retries. The algorithm is not yet recovered.
+- Authentication: see 3.7.1 (algorithm recovered, byte exact).
 - Large file transfer commands [C opcodes]: 0x21 NotifyPrepareEnv, DeviceExtendParam (carries a "has CRC16" flag and the device handle), 0x1B StartLargeFileTransfer (payload: u32 file size, u16 CRC16, then the file path bytes), 0x1D LargeFileTransferOp (device asks for a buffer: u16 size, u32 offset, the app answers with that slice), 0x1C Stop, 0x1E Cancel, 0x20 GetName (device asks the app to rename if the name exists; up to a retry limit). The device returns a transfer MTU in the Start response. The transfer is device pulled: the badge requests ranges by offset and size and the app responds.
 - File CRC16 [C, from native disassembly of libjl_crc.so]: CRC-16/XMODEM (polynomial 0x1021, initial value passed in as 0, no reflection, no final xor), nibble-table implementation; check value of "123456789" is 0x31C3.
 - Worked example (illustrative, field encodings of the name are [I]):
@@ -243,6 +243,35 @@ Media files for this path [C]:
 FE DC BA C0 1B 00 13 00 00 00 03 E8 9D D6 2F 00 78 00 2E 00 6A 00 70 00 67 00 EF
 ```
 - Worked control frames [C]: file type announce `9E EB 02 DC 01 00 0C`; get info `9E CA 02 C6 01 00 01`.
+
+### 3.7.1 RCSP authentication (libjl_auth.so) [C, verified by emulation]
+Where it runs: the Jieli helper (`BluetoothHelper`, option `useDeviceAuth`, default true) starts auth on every new connection before any RCSP frame. Auth messages are RAW GATT writes on 0xAE01 and raw notifications on 0xAE02 (not RCSP framed). Timeout 5 s (`setAuthTimeout(5000)`). Messages (17 bytes or 5 bytes):
+- `00 | R[16]`: a challenge (random 16 bytes).
+- `01 | E1(R)`: the answer to a challenge.
+- `02 70 61 73 73` ("\x02pass"): auth accepted.
+- Reset-auth-flag command, sent first by the app: `FE DC BA C0 06 00 02 00 01 EF` (a normal RCSP frame, command opcode 0x06, payload `00 01`), then 50 ms later the app's own challenge.
+
+Exchange [C, from RcspAuth.startAuth / handleAuthData]:
+1. App sends reset-auth-flag frame, waits, then sends `00 | Rapp` (16 random bytes from native `rand()`, unseeded).
+2. Badge replies `01 | X`. App computes the expected `01 | E1(Rapp)` and compares all 17 bytes; mismatch is error 40980. On match the app sends `02 70 61 73 73`.
+3. The badge sends its own challenge `00 | Rdev`; the app replies `01 | E1(Rdev)` (error 40979 if the write fails).
+4. Badge sends `02 70 61 73 73` when it accepts the app; the app then marks the device authenticated (if the badge never sends it, a 5 s timer reports failure). The order is fixed: the app's challenge is verified first (the app ignores a device challenge until its own check passed).
+A client must therefore implement both directions; the only secret is the constant default key below, which is embedded in the library.
+
+Native layout [C]: JNI natives registered in JNI_OnLoad for class `com/jieli/jl_rcsp/impl/RcspAuth`: `nativeInit`, `getRandomAuthData` (returns `00` + 16 bytes of libc `rand()`), `getEncryptedAuthData(byte[17])` (returns `01` + E1(addr, input[1..16], key)), `setLinkKey(byte[16])` (replaces the key; the app may pass a per-device key, see below). Constants in `.data`: key `06 77 5F 87 91 8D D4 23 00 5D F1 D8 CF 0C 14 2B`, six-byte "address" `11 22 33 33 22 11`.
+
+Algorithm [C]: E1 as in the Bluetooth Core Specification legacy authentication, on SAFER+ with the standard tables (exp = 45^i mod 257, log inverse, bias B_p[i] = e[e[17p+i+1]]):
+```
+T   = Ar(K, R)                        # 8 rounds SAFER+, key schedule rotl3 of 17-byte key
+M[i]= (T[i] xor R[i]) + A[i mod 6]    # A = 6-byte address, mod 256
+K~  = K with per-byte offsets  (sub 17,xor E5,sub 21,xor C1,sub 4D,xor A7,sub 6B,xor 83,
+                                xor E9,sub 1B,xor DF,sub 3F,xor B3,sub 59,xor 95,sub 7D)
+OUT = Ar'(K~, M)                      # all 16 bytes returned (not truncated to 4)
+```
+Ar' differs from Ar only in that M is folded into the state before round 3 using the same xor/add pattern as the round key (xor on byte positions 0,3 mod 4, add on 1,2). Round layout: key K(2r-1) xor/add (xor on positions i mod 4 in {0,3}), exp on positions 0,3,4,7,8,11,12,15 and log on the rest, key K(2r) add/xor, then four 2-PHT layers separated by the Armenian shuffle (8,11,12,15,2,1,6,5,10,9,14,13,0,7,4,3). Output transform XORs/ADDs K17.
+Reference implementation: `rebeambox/jl_auth.py` (`e1`, `encrypt_challenge`). Test vectors in `tests/test_jl_auth.py` were produced by emulating the real `function_E1test` (tools/emulate_jl_auth.py, unicorn) and agree with the Python code on 50 random key, address and challenge combinations. Example: key default, address fixed, R = 16 zero bytes gives `9e43df377b3a46ce751634667e215de5`.
+Unresolved [I]: the device side cannot be checked without hardware; the app itself always uses the default key, not one injected through `setLinkKey` (Confirmed: no code in the app calls `setLinkKey`/`setDeviceConnectionLinkKey`, so the default key is used); the device side is expected to run the same E1 with the same constants.
+Note the same E1/E21/SAFER+ family also appears in `function_E21` (E21(rand, addr) with last rand byte xor 6), exported but not called by the JNI natives.
 
 ### 3.8 Full upload sequence, BadgeSdk
 1. Scan unfiltered; accept AD type 0xFF with byte0 = 0xB3; shape 0x6D = circle.

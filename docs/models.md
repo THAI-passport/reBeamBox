@@ -53,3 +53,7 @@ Tags: [C] confirmed from the decompiled app (Beambox+ 1.0.14), [W] reported by a
 - Nikko and Nano on-air names beyond `E-badge` and `Nikko-badge(BLE)`: [U], scan a real unit with `rebeambox scan --all`.
 - Whether Nikko exposes 0xAE00 as well: [U].
 - Maximum video length and allowed AVI parameters on the nn20 path: the app builds a frame container, not an AVI, for animations. Videos are sent as frame sequences there; AVI (MJPEG) is the BadgeSdk path only [C]. The client's nn20 `send-gif` and `send-video` follow this.
+
+## Update from user (2026-10-11)
+
+The user states the Pulse (Nikko) screen is 1.8 inch. This is consistent with third-party reports of 1.83 inch and conflicts with the retail copy that says 1.28 inch; treat 1.8 inch as [W] until measured on hardware.

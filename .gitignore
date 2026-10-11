@@ -1,1 +1,5 @@
 node_modules/
+analysis/apk/
+analysis/decompiled/
+.venv/
+__pycache__/

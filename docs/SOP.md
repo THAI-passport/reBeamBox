@@ -68,6 +68,8 @@ Versions used: JDK 17.0.20.1, jadx 1.5.6, apktool 3.0.3, bleak 3.0.2, pillow 12.
 Commit instead: notes in the repo's own words, the protocol spec, original client code, tests, scripts.
 
 ## 8. Pitfalls encountered
+Full running log with causes and status: docs/problem_solution.md. Append to it whenever anything goes wrong.
+
 - Relative path bug: in `setup-tools.sh`, `cd "$(dirname "$0")/.."` ran after an earlier `cd ~/tools`, so a relative `$0` no longer resolved. Fix: compute `ROOT="$(cd "$(dirname "$0")/.." && pwd)"` at the top before any `cd`, and use `cd "$ROOT"` later.
 - tshark needs root: apt cannot run without sudo, so tshark is not installed. The script prints a notice instead of failing. Options: ask for sudo, build Wireshark from source in user space, or parse pcaps with Python (scapy or pyshark needs tshark, so prefer reading btsnoop logs directly).
 - Missing git identity makes `git commit` fail even after `git add`; the staged state is kept, so just set the identity and commit again.
@@ -104,6 +106,7 @@ TODO. Planned: Python client with bleak and Pillow, scan and connect, image and 
 TODO. Planned: pytest unit tests for packet serialization, checksum, chunking, and frame conversion; golden vectors derived from the spec; no hardware required.
 
 ## 14. Reporting checklist
+- Update docs/problem_solution.md with any new problem
 - Tools and versions
 - APK source URL, file size, SHA-256, version name and code
 - Validation results and any suspicious findings

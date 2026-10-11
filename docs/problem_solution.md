@@ -404,3 +404,24 @@ Entry format: date, phase, problem, cause, solution (or Status: Unsolved plus wh
 - Problem: `.[dev]` pulled unicorn, capstone and pyelftools, which need wheels or a compiler and are used by only one test file and the RE tools; setup-tools.sh installed pytest without the package metadata.
 - Cause: all extras were lumped together.
 - Solution: extras split into test, emulation, full, with dev as an alias of test; setup script gained `--full`/`--emulation` and tolerates a failed emulation install; CI installs `.[test]`; `pytest-asyncio` was dropped because no test uses it. Verified in fresh venvs: core+test 303 passed, 2 skipped; full 304 passed, 1 skipped.
+
+## 57. Docs drift: hard-coded test counts and conflicting screen and size values
+- Date: 2026-10-12
+- Phase: docs
+- Problem: README, HANDOFF, SOP and the test plan carried test counts (148, 202, 250, 303, 304) that no longer matched, and screen size, picture size and video cap were restated in several files with different values.
+- Cause: Each milestone appended a new number or value instead of replacing the old one.
+- Solution: Counts removed (run `pytest -q` or read the Actions result). New `docs/FACTS.md` is the single source for screens, 360 versus 368, transports, chip, limits and safety defaults; README, models.md, pulse.md and HANDOFF link to it. Status: Solved.
+
+## 58. --model overrode the picture size the badge reports
+- Date: 2026-10-12
+- Phase: client
+- Problem: `--model nikko` set `--size` to 368, which then won over the size reported by the badge (for example 360), contradicting the README and the intended rule.
+- Cause: `apply_model` copied the profile size into `args.size`, which the client treats as an explicit override. Found while checking docs for contradictions.
+- Solution: `apply_model` leaves `args.size` alone; the client falls back to 368 only when the badge reports nothing. Test added in `tests/test_models.py`. Status: Solved.
+
+## 59. Daily write cap
+- Date: 2026-10-12
+- Phase: safe-write
+- Problem: Safe-write only warned about high daily counts, so a loop could still wear out flash.
+- Cause: Policy was warnings plus a minimum interval only.
+- Solution: Hard cap of 50 writes per badge per rolling 24 hours (`--max-per-day`, 0 disables, `--force` overrides), `CapReached` is a `Blocked` subclass so the CLI exits 2. The default warning threshold moved from 100 to 40 so the warning comes before the cap. Status: Solved.

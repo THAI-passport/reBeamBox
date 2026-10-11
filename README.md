@@ -32,7 +32,7 @@ python -m rebeambox ...                          # same as the command
 Press the badge Bluetooth button once first (the app's instructions say this enables phone transfer). If your badge advertises a different name, add `--name <prefix>`.
 
 ## Models
-`--model nikko|nano|niji` (Nikko is the Pulse). It adds the model name to the scan filter, sets the default size (368) and video cap (3 s, Niji 5 s) and picks the still encoding. All three speak the nn20 service 0x01F0 according to third-party reports, so stills go out as a one-frame animation container (type 5); `--nn20-still album` selects the app's type 6 path. Put the badge on its pairing screen first, it advertises as `E-badge` only then. Details: docs/models.md.
+`--model nikko|nano|niji` (Nikko is the Pulse). It adds the model name to the scan filter, sets the video cap and picks the still encoding (it never overrides the picture size the badge reports). All three speak the nn20 service 0x01F0 according to third-party reports, so stills go out as a one-frame animation container (type 5); `--nn20-still album` selects the app's type 6 path. Put the badge on its pairing screen first, it advertises as `E-badge` only then. Details: docs/models.md; screen sizes, 360 versus 368, chip and limits: docs/FACTS.md.
 
 ## Wi-Fi models and live frames
 Products that the vendor server marks as Wi-Fi expose an access point (SSID contains `E-Badge`, gateway 192.168.8.1). Join it with your OS first, then:
@@ -99,6 +99,7 @@ python -m pytest -q                  # no hardware (250 pass, 1 skip); see docs/
 - docs/hardware-test-v1.md: tests to run with a real badge, with pass/fail criteria and a results template
 - docs/first-session-checklist.md: what to capture and report on the first real badge test
 - docs/models.md: NIKKO, NANO, NIJI comparison, transport per model, web recon
+- docs/FACTS.md: one fact sheet for screen sizes, picture size, transports, chip and limits
 - docs/pulse.md: Pulse-specific findings and how the client handles them
 - docs/ads-removal.md: how the original app shows promotions, and that this client has none
 - docs/SOP.md: reverse engineering procedure

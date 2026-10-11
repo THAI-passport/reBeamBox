@@ -25,7 +25,8 @@ def _add_common(p):
     p.add_argument("--ack-batch-size", type=int, default=4, help="nn20 ACK mode: packets per batch (default 4, falls back to 1 after errors)")
     g = p.add_argument_group("safe-write policy (flash protection, docs/safe-write.md; not applied to --dry-run)")
     g.add_argument("--min-interval-s", type=float, default=safewrite.DEFAULT_MIN_INTERVAL_S, help="minimum seconds between writes to one badge (default 30)")
-    g.add_argument("--warn-per-day", type=int, default=safewrite.DEFAULT_WARN_PER_DAY, help="warn above this many writes in 24 h (default 100, 0 = off)")
+    g.add_argument("--warn-per-day", type=int, default=safewrite.DEFAULT_WARN_PER_DAY, help="warn above this many writes in 24 h (default 40, 0 = off)")
+    g.add_argument("--max-per-day", type=int, default=safewrite.DEFAULT_MAX_PER_DAY, help="hard cap on writes per badge in 24 h (default 50, 0 = no cap)")
     g.add_argument("--warn-total", type=int, default=safewrite.DEFAULT_WARN_TOTAL, help="warn above this many writes per badge (default 10000, 0 = off)")
     g.add_argument("--force", action="store_true", help="ignore the minimum interval and the unchanged-image skip")
     g.add_argument("--no-delta", action="store_true", help="do not skip an upload identical to the last one")
@@ -38,7 +39,7 @@ def _add_common(p):
 def make_gate(args, badge_id, log):
     if args.dry_run or args.no_safe_write:
         return None
-    pol = safewrite.Policy(True, args.force, not args.no_delta, args.min_interval_s, args.warn_per_day, args.warn_total)
+    pol = safewrite.Policy(True, args.force, not args.no_delta, args.min_interval_s, args.warn_per_day, args.warn_total, args.max_per_day)
     return safewrite.Gate(args.badge_id or badge_id, pol, safewrite.Store(args.state_dir), log=log)
 
 

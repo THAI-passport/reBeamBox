@@ -224,7 +224,7 @@ def test_wifi_send_is_gated(tmp_path):
 
 def test_cli_flags_and_defaults():
     a = cli.build_parser().parse_args(["send-image", "x.png"])
-    assert a.min_interval_s == 30 and a.warn_per_day == 100 and a.warn_total == 10000
+    assert a.min_interval_s == 30 and a.warn_per_day == 40 and a.warn_total == 10000
     assert not a.force and not a.no_delta and not a.no_safe_write and a.badge_id is None and a.state_dir is None
     a = cli.build_parser().parse_args(["send-gif", "x.gif", "--min-interval-s", "5", "--warn-per-day", "7", "--warn-total", "9",
                                        "--force", "--no-delta", "--badge-id", "desk", "--state-dir", "/tmp/q"])
@@ -268,3 +268,64 @@ def test_main_maps_skip_to_exit_0_and_block_to_exit_2(monkeypatch, capsys):
     assert cli.main(["send-image", "x.png"]) == 0 and "skipped" in capsys.readouterr().err
     monkeypatch.setattr(cli, "_run_send", blocked)
     assert cli.main(["send-image", "x.png"]) == 2 and "not sent" in capsys.readouterr().err
+
+
+# daily hard cap --------------------------------------------------------------------------------------------------------
+
+def test_defaults_include_a_50_per_day_cap():
+    assert safewrite.Policy().max_per_day == 50 and safewrite.DEFAULT_WARN_PER_DAY < safewrite.DEFAULT_MAX_PER_DAY
+    a = cli.build_parser().parse_args(["send-image", "x.png"])
+    assert a.max_per_day == 50 and a.warn_per_day == 40
+
+
+def test_cap_blocks_the_next_write_and_is_a_blocked_subclass(tmp_path):
+    clk = Clock()
+    g = gate(tmp_path, clk, min_interval_s=0, delta=False, max_per_day=3, warn_per_day=0)
+    for _ in range(3):
+        g.check(b"x")
+        g.commit(b"x")
+        clk.t += 60
+    with pytest.raises(safewrite.CapReached) as e:
+        g.check(b"x")
+    assert isinstance(e.value, safewrite.Blocked) and "daily cap reached: 3 writes" in str(e.value)
+    assert safewrite.Store(str(tmp_path)).data["total"] == 3                 # a refused write is not counted
+
+
+def test_cap_is_per_badge_and_rolling(tmp_path):
+    clk = Clock()
+    a = gate(tmp_path, clk, badge="a", min_interval_s=0, delta=False, max_per_day=2)
+    for _ in range(2):
+        a.commit(b"x")
+        clk.t += 10
+    with pytest.raises(safewrite.CapReached):
+        a.check(b"x")
+    gate(tmp_path, clk, badge="b", min_interval_s=0, delta=False, max_per_day=2).check(b"x")     # other badge is unaffected
+    clk.t += safewrite.DAY                                                                          # the day rolls over
+    a.check(b"x")
+
+
+def test_cap_override_flags(tmp_path):
+    clk = Clock()
+    base = dict(min_interval_s=0, delta=False, max_per_day=1)
+    gate(tmp_path, clk, **base).commit(b"x")
+    clk.t += 1
+    with pytest.raises(safewrite.CapReached):
+        gate(tmp_path, clk, **base).check(b"x")
+    gate(tmp_path, clk, force=True, **base).check(b"x")                        # --force
+    gate(tmp_path, clk, **dict(base, max_per_day=0)).check(b"x")               # --max-per-day 0 = no cap
+    gate(tmp_path, clk, **dict(base, max_per_day=5)).check(b"x")               # raised cap
+    gate(tmp_path, clk, enabled=False, **base).check(b"x")                     # --no-safe-write
+    with pytest.raises(ValueError):
+        safewrite.Policy(max_per_day=-1)
+
+
+def test_cap_makes_cli_exit_2(monkeypatch, capsys):
+    async def capped(args):
+        raise safewrite.CapReached("daily cap reached: 50 writes")
+    monkeypatch.setattr(cli, "_run_send", capped)
+    assert cli.main(["send-image", "x.png", "--max-per-day", "50"]) == 2 and "daily cap" in capsys.readouterr().err
+
+
+def test_make_gate_passes_the_cap(tmp_path):
+    a = cli.build_parser().parse_args(["send-image", "x", "--max-per-day", "7", "--state-dir", str(tmp_path)])
+    assert cli.make_gate(a, "id", print).policy.max_per_day == 7

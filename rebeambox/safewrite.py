@@ -11,7 +11,8 @@ import os
 import time
 
 DEFAULT_MIN_INTERVAL_S = 30.0
-DEFAULT_WARN_PER_DAY = 100
+DEFAULT_WARN_PER_DAY = 40          # warn before the hard cap is reached
+DEFAULT_MAX_PER_DAY = 50           # hard cap: writes per badge in a rolling 24 hours (0 = no cap)
 DEFAULT_WARN_TOTAL = 10000
 KEEP_TIMES = 1000          # newest write times kept per badge
 DAY = 86400.0
@@ -23,6 +24,10 @@ class Skipped(Exception):
 
 class Blocked(Exception):
     """A write would break the minimum interval."""
+
+
+class CapReached(Blocked):
+    """The daily write cap for this badge is used up."""
 
 
 def state_dir(override=None):
@@ -82,11 +87,12 @@ class Store:
 
 class Policy:
     def __init__(self, enabled=True, force=False, delta=True, min_interval_s=DEFAULT_MIN_INTERVAL_S,
-                 warn_per_day=DEFAULT_WARN_PER_DAY, warn_total=DEFAULT_WARN_TOTAL):
-        if min_interval_s < 0 or warn_per_day < 0 or warn_total < 0:
+                 warn_per_day=DEFAULT_WARN_PER_DAY, warn_total=DEFAULT_WARN_TOTAL, max_per_day=DEFAULT_MAX_PER_DAY):
+        if min_interval_s < 0 or warn_per_day < 0 or warn_total < 0 or max_per_day < 0:
             raise ValueError("safe-write thresholds must not be negative")
         self.enabled, self.force, self.delta = enabled, force, delta
         self.min_interval_s, self.warn_per_day, self.warn_total = float(min_interval_s), int(warn_per_day), int(warn_total)
+        self.max_per_day = int(max_per_day)
 
 
 class Gate:
@@ -111,6 +117,9 @@ class Gate:
         t = self.now()
         if p.delta and not p.force and b["last_hash"] == payload_hash(payload):
             raise Skipped("identical to the last payload written to this badge (%d bytes); not writing again" % len(payload))
+        if p.max_per_day and not p.force and self.writes_last_day() >= p.max_per_day:
+            raise CapReached("daily cap reached: %d writes to this badge in the last 24 hours (cap %d; raise it with --max-per-day or use --force)"
+                             % (self.writes_last_day(), p.max_per_day))
         if not p.force and b["last"] is not None and 0 <= t - b["last"] < p.min_interval_s:
             raise Blocked("last write was %.0f s ago; minimum interval is %.0f s (wait, or use --force)" % (t - b["last"], p.min_interval_s))
         self.warnings = []

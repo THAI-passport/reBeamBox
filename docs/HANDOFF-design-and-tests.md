@@ -1,8 +1,8 @@
 # reBeamBox: design and test handoff report
 
-Audience: another AI (or engineer) who will improve this project. This file is self-contained; deeper detail lives in the linked docs. Date of writing: 2026-10-11. Repository: THAI-passport/reBeamBox (public, branch main).
+Audience: another AI (or engineer) who will improve this project. This file is self-contained; deeper detail lives in the linked docs. Date of writing: 2026-10-11 (refreshed after the first-contact tooling milestone, commit after 1b84ecd). Repository: THAI-passport/reBeamBox (public, branch main).
 
-Evidence labels used everywhere: [C] Confirmed from decompiled app code or native disassembly, [I] Inferred (reasoned, not shown directly), [W] reported by third parties on real hardware (not verified by us), [U] Unknown. Nothing in this project has been tested on a real badge.
+Evidence labels used everywhere: [C] Confirmed from decompiled app code or native disassembly, [I] Inferred (reasoned, not shown directly), [W] reported by third parties on real hardware (not verified by us), [U] Unknown. [U] unknown. Nothing in this project has been tested on a real badge; the software badges in `sim.py` are written from the same spec as the client, so passing tests prove self-consistency only.
 
 ## 1. Goal and scope
 - Goal: an open-source replacement client for the Beambox+ companion Android app (`com.guangshen.beambox`, version 1.0.14, versionCode 24) so a computer can push images, GIFs, short videos, text/name tags and live frames to Beambox round e-badges.
@@ -28,11 +28,13 @@ The app chooses by device name and product record [C]: names containing NEO or B
 - Type codes: 5 animation, 6 album/still, 13 JSON settings (only seen: `{"animation_type":n}` sent bare before an animation); 1, 2, 3, 4, 7 are defined but unused in analysed code.
 - Envelope for types 5 and 6: ASCII `{"type":T,"data":` + container bytes + `}`, chunked into P = min(446, max(23, MTU) - 12) data bytes (446 at MTU 512), at most 65535 packets.
 - Replies on 0x01F2: `A0 | type | 2 unused | L (one byte) | UTF-8 JSON | checksum`, L at most 255, may be split over notifications. JSON: acknowledgements containing `GetPacketSuccess` or `GetPacketFail`, and a status record pushed by the badge (fields allspace, brand, devname, freespace in KB, size string like "368,368", time_mode, type). The status is pushed, not requested [I from the absence of a request].
-- Pacing and ACK: `time_mode` 1 selects the no-response loop mode (20 ms between packets, no waiting for ACK); otherwise ACK mode: batches of 4 (adaptive 4, 2, 1), at least 50 ms interval, retry waits 500/1000/2000 ms, 3 retries. After the last packet wait `min(((N+999)//1000)*800+800, 3000)` ms. Minimum 300 ms between uploads. Free-space check: refuse if payload + 64 KiB exceeds freespace when known.
+- Chunking in the client [C formula, I that a badge accepts the sizes]: P = min(446, max(23, ATT MTU) - 12); every frame is P + 9 bytes = at most MTU - 3, so one ATT write per frame. The MTU is read from the Bluetooth stack after connect (`BleakLink.mtu`, 23 when unknown).
+- Client pacing [I, tuning values for hardware test H4]: `--packet-interval-ms` default 20 for both modes (the app uses 50 ms minimum in ACK mode, so this is faster than the app) and `--ack-batch-size` default 4, dropping to 1 after a failure and doubling back up to the configured size. Adaptive fallback [I]: when `time_mode` is 1 (no ACK) and a `GetPacketFail` reply arrives or a write raises (drop or disconnect), the session switches to ACK batches, reconnects first if the link is gone (`Link.reconnect`), and restarts the stream from packet 0 because the failure reply carries no packet index (a first packet with remaining = n - 1 starts a new upload in the software badge; real badge behaviour is [U]). ACK mode gives up with an error after 3 unanswered batches.
+- App pacing and ACK: `time_mode` 1 selects the no-response loop mode (20 ms between packets, no waiting for ACK); otherwise ACK mode: batches of 4 (adaptive 4, 2, 1), at least 50 ms interval, retry waits 500/1000/2000 ms, 3 retries. After the last packet wait `min(((N+999)//1000)*800+800, 3000)` ms. Minimum 300 ms between uploads. Free-space check: refuse if payload + 64 KiB exceeds freespace when known.
 - Media containers (little endian) [C layout]:
   - IMB still (type 6): 36-byte header `49 4D 42 00 | 4 | jpegLen+32 | fmt 11, 0, 0 | width u16 | height u16 | offset 36 | jpegLen | 0 | 0` then JPEG. Width/height written as 368 only for 368, else 360.
   - Animation container (type 5): magic 0x12345678, address-list length N*16+24 (BLE) or N*16+32 (Wi-Fi), N, interval ms, 12-byte label `output/<ms>ms`, total length minus 1, frame table (12-byte name `frame_00001.` + u32 offset), frame records with a 32-byte header (own offset, next offset, 11, 0, 0, width, height, data offset, JPEG length, 0, 0) then JPEG. Last frame points to the first.
-- Model default: stills are sent as a one-frame type 5 container (interval 3000 ms), per [W]; `--nn20-still album` selects IMB type 6. Both remain unverified on a Nikko.
+- Media defaults in the client [W-based design, unverified on Nikko]: a still is sent as a one-frame type 5 container with interval 3000 ms; `--nn20-still album` sends IMB type 6 instead. Stills are centre-cropped to a square and masked with a circle (alpha mask, black outside; `--square` disables), JPEG quality 90. The container width and height equal the size the badge reports in its status JSON ("360,360" or "368,368"), else `--size`, else 368; the IMB header collapses any size other than 368 to 360 [C app behaviour]. BadgeSdk stills use the size from the 0xDB reply.
 
 ### 3.2 BadgeSdk with Jieli RCSP (names NEO, B-Device) [C]
 - Advertising: manufacturer data (AD 0xFF) of at least 10 bytes: tag 0xB3 = badge, shape 0x6D circle or 0x6C square, 6-byte id, u16 project number. Only 0xB3 accepted by the SDK scanner.
@@ -63,6 +65,9 @@ The app chooses by device name and product record [C]: names containing NEO or B
 6. Real video length limit (retail 3 s; NIJI app window 5 s; code 10 s otherwise), flash space behaviour, duplicate file names.
 7. Bind reply offsets for protocol 26 and above (jadx merged branches).
 8. Niji touch notifications, if any.
+9. Whether a real nn20 badge accepts a stream restart from packet 0 after a failure (adaptive fallback), what `GetPacketFail` means in no-ACK mode, and whether ACK mode is answered when `time_mode` is 1 [U].
+10. Whether 0xC6 (info query) is answered before bind on BadgeSdk badges, which decides whether `probe --qualify` can get a handshake without binding [U].
+11. Whether Web Bluetooth write sizes above 244 bytes work on a given phone/browser (the page cannot read the MTU) [U].
 
 ## 6. Client architecture (`rebeambox`, version 0.1.0)
 Layering: pure byte builders and parsers first, then media, then async sessions against an abstract link, then CLI. Only `link.BleakLink` and `wifi.TcpChannel` touch real I/O.
@@ -75,21 +80,26 @@ Layering: pure byte builders and parsers first, then media, then async sessions 
 | `media.py` | Pillow stills (centre crop, circular mask, transparency on black), GIF and video frame loading, text and name tag rendering, ffmpeg MJPEG AVI builder with the documented command, caps |
 | `models.py` | profiles for nikko, nano, niji: name filters, video cap (3 s, niji 5 s), size 368, still mode |
 | `scan.py` | name filter (skip names containing BLE unless a configured name matches; defaults NEO, B-Device, E-badge), advertisement parser, bleak scan, `probe` GATT dump |
-| `link.py` | `Link` abstraction, `BleakLink`, `RecordingLink` (dry run) |
-| `session.py` | `RcspSession`, `BadgeSession`, `Nn20Session` (auth, bind, transfers, retries, pacing) |
+| `link.py` | `Link` abstraction (`write`, `subscribe`, `reconnect`, `service_uuids`, `describe`), `BleakLink` (MTU from the stack, reconnect, GATT description), `RecordingLink` (dry run and tests) |
+| `session.py` | `RcspSession`, `BadgeSession`, `Nn20Session` (MTU chunking, `interval`, `ack_batch`, no-ACK to ACK fallback with reconnect; BadgeSession does auth, bind, transfers, retries) |
 | `client.py` | `Job`, `detect_transport` (service discovery), `send`, `wifi_payload`, `send_wifi` |
 | `wifi.py` | control words, POST builder, camera frame, `WifiSession` (send_file, stream), `TcpChannel`, `SimChannel` |
 | `sim.py` | software badges: `SimBadgeSdk`, `SimNn20`, `SimWifiBadge` implementing the badge side from the spec |
-| `qualify.py` | `probe --qualify`: transport detection, read-only handshakes, Wi-Fi hint, first-contact report |
+| `qualify.py` | `probe --qualify`: scan, connect, MTU, GATT, `classify_services` (nn20, badge, both, none), `handshake_nn20` (listen only), `handshake_badge` (0xC6 only), `wifi_check` (nmcli SSIDs, bare TCP connect), `render_report`, `run` (writes `reports/first-contact-<timestamp>.md`) |
 | `cli.py` | commands below |
 - CLI: `rebeambox scan [--all] [--model]`, `probe [<address>] [--json] [--qualify --simulate nn20|badge --report-dir --no-redact --no-wifi-check --wait]`, `send-image`, `send-gif`, `send-video`, `send-text` (with `--subtitle`, colours, `--font`), `stream <video-or-gif> [--fps]` (Wi-Fi live frames). Common flags: `--address`, `--name` (repeatable), `--size`, `--square`, `--model nikko|nano|niji`, `--transport badge|nn20|wifi`, `--nn20-still gif|album`, `--packet-interval-ms` (20), `--ack-batch-size` (4), `--wifi-still imb|gif`, `--host`, `--port`, `--max-seconds`, `--quality`, `--quiet`, `--dry-run FILE`.
 - Dry run: no Bluetooth or network; talks to a software badge and writes every write (W) and reply (N) to FILE plus the exact payload to `FILE.payload`. BLE format: `W <short uuid> <length> <hex bytes>`; Wi-Fi format: `W|N <ctrl|upload> <length> <hex, long writes truncated to 64 bytes>`.
 - `--model`: adds model names to the scan filter, sets default size 368 for BLE (ignored for Wi-Fi unless `--size` is given), video cap and still mode.
 - Product questions that code cannot answer are flags (names, size, still mode, transport) so first hardware contact needs no code change.
 
+### 6.1 First-contact tooling (new)
+- `probe --qualify [--model M] [--address A] [--simulate nn20|badge] [--report-dir D] [--no-redact] [--no-wifi-check] [--wait S]`: finds the badge in the advertisements, connects, records MTU and the full GATT table, decides the transport, runs a read-only handshake and writes a Markdown report in the results-template layout of `docs/hardware-test-v1.md` (test id, model, name, services, manufacturer data, MTU, transport decision, handshake result, verdict, next commands). Verdict: PASS = transport identified and the badge answered; PARTIAL = identified but silent; FAIL = not found or no known service. Safety [C for what is sent]: nn20 badges are only listened to (nothing written); BadgeSdk badges receive only the 0xC6 info query. Addresses are masked (`AA:BB:CC:xx:xx:xx`) unless `--no-redact`. `reports/` holds only a README; generated reports are git-ignored. The Wi-Fi hint lists SSIDs containing E-Badge (Linux nmcli only) and tries a bare TCP connect to 192.168.8.1:8080 (no bytes sent). Untested on hardware; exercised against software badges.
+- `ui/` (`index.html`, `app.js`, `nn20.js`, `README.md`): dependency-free Web Bluetooth page (Chrome or Edge on localhost or https). Connects to 0x01F0, subscribes to 0x01F2 and shows the status JSON, picks an image, crops it to 360 or 368 (badge-reported by default) with a circular mask on black, builds the one-frame type 5 container, chunks by an MTU input (default 247, halved on a write error because Web Bluetooth cannot read the MTU), and writes to 0x01F1 with the same ACK-batch and no-ACK logic as Python. A Content-Security-Policy blocks all network access; no ads, analytics, or emoji. `nn20.js` is pure and loadable from Node. `ui/package.json` and `node_modules` are an unused leftover of icon experiments.
+- `tools/replay_pcap.py <capture> [--out DIR] [--json FILE] [--handle 0xHHHH=nn20|control|rcsp]`: reads btsnoop (datalink 1001 and 1002), classic pcap and pcapng (linktype 187 and 201), reassembles fragmented ACL/L2CAP, parses ATT write request/command and notifications, maps handles to UUIDs from Read By Type and Find Information responses in the capture (otherwise classifies by frame shape), keeps only writes to 0x01F1 (nn20), C2E6FD02 (control) and 0xAE01 (RCSP), reassembles nn20 transfers (flags incomplete transfers and bad checksums), decodes IMB and 0x12345678 containers into JPEG files, decodes control frames, and reassembles the RCSP file (detects per-chunk CRC16, separates unframed auth bytes). Purpose: decode the reference capture of the vendor app with the same parsers as the client and compare byte for byte.
+
 ## 7. Software test suite
-- Update (first-contact tooling): the suite now has 202 passed, 1 skipped, 1 deselected (`python -m pytest -q`); new files `test_pacing_mtu_fallback.py`, `test_qualify.py`, `test_replay_pcap.py`, `test_ui_nn20_js.py`.
-- Status: the user reports 148 tests passed (pytest run on this repository after the software test plan was added; native auth fuzz, Thai font and ffmpeg tests skip when their prerequisites are missing, and the slow marker is deselected by default). The assistant that wrote the last 59 tests did not run them; the report of 148 passed is the first execution.
+- Status [C, measured on the box 2026-10-11]: `python -m pytest -q` gives 202 passed, 1 skipped, 1 deselected (the slow auth fuzz). Earlier the user reported 148 passed on a machine where native-auth, Thai-font or ffmpeg tests may have skipped; the count differs because of the 56 tests added in the first-contact milestone and per-machine skips. Native fuzz, Thai font and ffmpeg tests skip when prerequisites are missing; the slow marker is deselected by default.
+- New files in the first-contact milestone: `test_pacing_mtu_fallback.py` (MTU rule table, frames fit one ATT write, ACK batch bound, bad pacing rejected, CLI flag defaults and overrides, no-ACK to ACK fallback on a reported drop, fallback after a simulated disconnect with reconnect, failure when reconnect is unsupported, default type 5 one-frame 3000 ms, album type 6, reported size 360 vs 368, circular mask corners), `test_qualify.py` (redaction, service classification table, simulated qualify for nn20 and badge with report fields, listen-only nn20 handshake, single 0xC6 write, silent badge gives PARTIAL, verdict rules, injected Wi-Fi probe, CLI `probe --qualify --simulate`), `test_replay_pcap.py` (synthetic btsnoop, pcapng with linktype 201 and 187, classic pcap; fragmented ACL; discovery and heuristic classification; manual handle override; IMB decode; settings frame and bad checksum; incomplete transfer; control and RCSP streams with CRC16 and unframed auth bytes; CLI extraction; rejecting junk), `test_ui_nn20_js.py` (Node: JS container, frames at four MTUs, packet size rule and reply parser equal the Python output; UI files contain no network calls or emoji; skipped without Node).
 - Coverage (details and per-test locations in `docs/software-test-v1.md`):
   - Older files: frame serialization and checksums (`test_control.py`, `test_rcsp.py`, `test_nn20.py`), auth vectors from the emulator (`test_jl_auth.py`), media (`test_media.py`), scan filter (`test_scan.py`), models (`test_models.py`), sessions against software badges including retries and no-ACK mode (`test_session_sim.py`), CLI dry runs (`test_cli_dryrun.py`), Wi-Fi sessions including a real loopback TCP server (`test_wifi.py`), no vendor calls (`test_no_vendor_calls.py`).
   - `test_sw_containers.py`: IMB and animation container round trips with an independent parser, checksum edge cases (empty, maximum, corrupted), property-style random round trips.
@@ -99,7 +109,6 @@ Layering: pure byte builders and parsers first, then media, then async sessions 
   - `test_sw_snapshot.py`: hex-locked nn20 frames, IMB header, animation container and Wi-Fi POST header from a fixed embedded JPEG; CLI dry run self-consistency and determinism.
 - Limits: software badges are written from the same spec as the client, so they prove consistency, not truth. Nothing here proves behaviour on a badge.
 
-- New in this iteration: MTU-derived packet size P = min(446, mtu - 12) with automatic fallback from no-ACK to ACK batches (restart from packet 0, reconnect on write errors; Inferred, see problem_solution.md entry 40); `ui/` (index.html, app.js, nn20.js) Web Bluetooth harness for nn20 type 5 stills, byte-checked against Python by a Node test; `tools/replay_pcap.py` (btsnoop 1001/1002, pcap and pcapng with linktype 187/201) decoding captures of the vendor app with the nn20, control and rcsp parsers; `probe --qualify` report generator. None of it has touched hardware.
 
 ## 8. Hardware test plan (not yet run)
 `docs/hardware-test-v1.md`, with the capture steps in `docs/first-session-checklist.md`. Tests: H1 scan, advertised name and services (decides transport); H2 type 5 vs type 6 still display; H3 with and without auth (BadgeSdk) and absence of auth on nn20; H4 BLE throughput and fps; H5 Wi-Fi fps and stutter threshold (only if an access point exists); H6 Niji touch notifications; H7 real video length limit. Each has steps, tools, pass or fail criteria; a results template ends the document. Results go to a repository issue titled `First session: <model> <date>` and to `docs/problem_solution.md`.
@@ -107,7 +116,7 @@ Layering: pure byte builders and parsers first, then media, then async sessions 
 ## 9. Flaws of the original design and streaming notes
 Full list with evidence in `docs/hardware-prediction.md` section 2. Main points: whole-file upload only (no partial display or resume); timid ACK batching (about 7 to 9 KB/s); fixed pacing instead of link-aware flow control; no streaming or direct-draw command; JPEG only, a full JPEG per animation frame; weak 8-bit checksum and substring-matched JSON status; three incompatible transports selected by name substring; two GATT links on the BadgeSdk path with a fixed 1550 ms wait; 360 vs 368 size inconsistency; up to 3 s end-of-transfer guard and 300 ms minimum gap; flash write for every update.
 Streaming (details `docs/streaming-plan.md`, `docs/hardware-prediction.md` section 1): the only live path in the app is the Wi-Fi camera stream (3 fps cap, 30 KB frames). Estimated bounds: Wi-Fi up to about 100 KB/s at the app limit (try 5 to 10 fps with 8 to 12 KB frames, untested); BLE nn20 no-ACK about 22 KB/s (1.5 to 2 fps for 12 KB frames), ACK mode about 9 KB/s, BadgeSdk 10 to 30 KB/s. Plan: use `rebeambox stream` on Wi-Fi models; on BLE-only models use pre-rendered 3 to 5 s animations or stills under 1 fps; phases and fallbacks (custom firmware only with recovery) are in the plan. Touch-driven features cannot be built from the documented protocol (section 4).
-Ideas for improvement: a real-device transport probe command that auto-runs H1 to H2 and writes the report template; configurable pacing and MTU flags; asyncio-based Wi-Fi fps benchmark; hypothesis-based property tests; a minimal GUI after hardware validation.
+Ideas for improvement (the probe command, pacing and MTU flags are now done): extend `probe --qualify` to run H2 automatically with a test still after the user confirms; an asyncio Wi-Fi fps benchmark; use `tools/replay_pcap.py` output as golden data once a vendor-app capture exists (diff client frames against it); hypothesis-based property tests; a minimal GUI after hardware validation; learn the real restart semantics after a failed packet.
 
 ## 10. Repository layout and key docs
 ```
@@ -115,21 +124,23 @@ rebeambox/            client package (see section 6)
 tests/                software tests (test_*.py older, test_sw_*.py plan v1)
 docs/                 all documentation (below)
 scripts/              setup-tools.sh (tool install without sudo), spec_vectors.py (hex vectors)
-tools/                emulate_jl_auth.py (unicorn, needs the .so which is not in the repo)
+tools/                emulate_jl_auth.py (unicorn, needs the .so which is not in the repo); replay_pcap.py (capture decoder)
 analysis/             SOURCES.md (APK provenance and hashes); apk/, decompiled/, work/ are git-ignored
-ui/                   Node package manifest and node_modules only; not part of the Python client
+ui/                   Web Bluetooth harness (index.html, app.js, nn20.js, README.md); package.json and node_modules are unused leftovers
+reports/              README only; `probe --qualify` writes first-contact-<timestamp>.md here (git-ignored)
 pyproject.toml        package metadata, pytest options (slow marker deselected by default)
 ```
 | Doc | Content |
 |---|---|
-| `README.md` | install, quick start, model and Wi-Fi sections, status |
-| `docs/PROTOCOL.md` | byte-exact BLE protocols with evidence labels, auth, corrections from third-party reports, notification inventory |
+| `README.md` | install, quick start, model and Wi-Fi sections, first-contact section, status |
+| `ui/README.md`, `reports/README.md` | web harness usage; where qualification reports go |
+| `docs/PROTOCOL.md` | byte-exact BLE protocols with evidence labels, auth, corrections from third-party reports, notification inventory, section 9 client behaviour (MTU, pacing, fallback, qualification, replay) |
 | `docs/wifi-protocol.md` | Wi-Fi path |
 | `docs/models.md`, `docs/pulse.md` | per-model analysis; Pulse equals NIKKO |
 | `docs/software-test-v1.md`, `docs/hardware-test-v1.md`, `docs/first-session-checklist.md` | test plans and first session procedure |
 | `docs/streaming-plan.md`, `docs/hardware-prediction.md` | streaming plan, bandwidth table, flaws, hardware prediction |
 | `docs/SOP.md` | reverse-engineering procedure and tooling rationale (section 15) |
-| `docs/problem_solution.md` | dated log of every problem (39 entries) |
+| `docs/problem_solution.md` | dated log of every problem (43 entries; entries 40 to 43 cover the no-ACK restart point, silent badge after reconnect, replay classification, Web Bluetooth MTU) |
 | `docs/app-behaviour.md`, `docs/binaries.md`, `docs/ads-removal.md` | app screens and flows, shipped binaries, promotional surfaces |
 
 ## 11. Install and run
@@ -142,5 +153,10 @@ python -m pytest -q                                  # whole suite, no hardware
 python -m pytest -q -m slow tests/test_sw_auth_fuzz.py   # larger auth fuzz
 rebeambox send-image photo.jpg --model nikko --dry-run frames.txt --transport nn20   # no Bluetooth
 rebeambox scan --all --timeout 15        # first contact with a badge, see docs/first-session-checklist.md
+rebeambox probe --qualify --model nikko  # read-only qualification, writes reports/first-contact-<timestamp>.md
+rebeambox probe --qualify --simulate nn20 --report-dir /tmp/rp   # same against a software badge
+rebeambox send-image photo.jpg --transport nn20 --packet-interval-ms 20 --ack-batch-size 4 --nn20-still gif --address <ADDR>
+python tools/replay_pcap.py btsnoop_hci.log --out extracted/     # decode a vendor-app capture (also .pcap, .pcapng)
+(cd ui && python3 -m http.server 8000)   # Web Bluetooth harness at http://localhost:8000
 ```
 Environment switches for tests: `JL_AUTH_SO` (path to libjl_auth.so for the native fuzz; default `analysis/work/so/lib/arm64-v8a/libjl_auth.so`), `REBEAMBOX_FUZZ_N`, `REBEAMBOX_FUZZ_SLOW_N`, `REBEAMBOX_THAI_FONT`. Rebuilding the analysis tree (jadx, apktool, APK download) is scripted in `scripts/setup-tools.sh` and described in `docs/SOP.md`; the APK is not redistributed.

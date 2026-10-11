@@ -16,8 +16,8 @@ class Job:
         frames, interval = self.frames_fn(size)
         if self.kind == "still":
             return media.to_jpeg(frames[0], self.quality), False, self.name
-        fps = max(1, min(33, 1000 // max(media.MIN_INTERVAL_MS, interval)))
-        return media.frames_to_avi(frames, fps, size, len(frames) / fps + 1), True, self.name.rsplit(".", 1)[0] + ".avi"
+        fps = 1000.0 / max(media.MIN_INTERVAL_MS, interval)          # BadgeMediaFileBuilder.a: -r %.3f
+        return media.frames_to_avi(frames, fps, size, None), True, self.name.rsplit(".", 1)[0] + ".avi"
 
     def nn20_payload(self, size=368):
         frames, interval = self.frames_fn(size)

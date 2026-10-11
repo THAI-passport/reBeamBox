@@ -336,3 +336,18 @@ Entry format: date, phase, problem, cause, solution (or Status: Unsolved plus wh
 - Problem: `git push` was refused: an OAuth App cannot create or update `.github/workflows/ci.yml` without the `workflow` scope.
 - Cause: The stored GitHub credential has no `workflow` scope.
 - Solution: Not worked around (no token handling). The unpushed local commits were rewritten so the workflow sits at `ci/ci.yml`, everything else was pushed. Status: Unsolved for activation; the owner must either grant the `workflow` scope (`gh auth refresh -s workflow`) and `git mv ci/ci.yml .github/workflows/ci.yml`, or add the file in the GitHub web UI.
+
+
+## 48. jadx type inference failure on the animation builder, three recovery attempts
+- Date: 2026-10-11
+- Phase: decompiler recovery
+- Problem: `BadgeMediaFileBuilder.a` still fails after `--show-bad-code` and `-m simple`; `--deobf` cannot help a type failure.
+- Cause: a Dalvik register is reused as both long and double (1000.0), which jadx type inference rejects.
+- Solution: smali read (already done) plus dex2jar and CFR 0.152 on classes2.dex: CFR produced readable code identical in behaviour. Exact behaviour documented in PROTOCOL.md 3.6.1; simple mode reduced errors 63 to 35 and the remaining errors are library code (compose, coroutines, ZXing encoder, media3, GMS). Scripted in scripts/recover-failed-methods.sh.
+
+## 49. Client AVI command differed from the app in fps formatting
+- Date: 2026-10-11
+- Phase: decompiler recovery
+- Problem: the client used an integer fps (`-r 15`) and a fixed -t, the app uses `-r %.3f` from 1000/interval and duration = frames*interval/1000.
+- Cause: the first reading of the builder summarised the command but not the number formatting.
+- Solution: `avi_command` and `Job.badge_payload` follow the exact formulas; tests updated. Impact on a real badge is Unknown (likely none).

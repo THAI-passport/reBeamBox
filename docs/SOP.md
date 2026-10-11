@@ -148,6 +148,12 @@ Procedure that worked, reusable for any secondary transport:
 6. Build the software badge with the same state machine (control words, HTTP, camera mode) and serve it both in process (dry run) and over a loopback TCP server in a test.
 7. For input events: enumerate the incoming command parsers and listener interfaces, not text searches for names like touch; then state the negative result with the list.
 
+## 12.3 Recovering methods the decompiler failed on
+1. List the failures: grep the output for `JADX ERROR` and print the enclosing signature; classify each as library (androidx, kotlin coroutines, GMS, ZXing) or app (package of the app, or referencing it). On this APK 38 error markers were found; only one app method mattered (`BadgeMediaFileBuilder.a`); the rest were library code (compose, coroutines, QR encoder, media3).
+2. Re-run with `jadx -m simple --show-bad-code`: region-maker overflows disappear (63 errors became 35) and the splash activity deep-link switch was recovered; type-inference failures stay.
+3. For a type-inference failure read the smali (apktool) and, to confirm, convert the one dex with dex2jar and decompile the class with CFR (`--jarfilter`); CFR handles a register reused as long and double. Script: `scripts/recover-failed-methods.sh`. Both outputs stay in git-ignored `analysis/work`.
+4. Only record behaviour, not code; find callers by grepping the call site to learn where each argument comes from.
+
 ## 13. Phase: tests
 `.venv/bin/python -m pytest tests -q` (software test plan: docs/software-test-v1.md; hardware plan: docs/hardware-test-v1.md; earlier count 64 tests, no hardware, ffmpeg tests skip if ffmpeg is missing). Coverage: frame serialization and checksums (control, nn20, rcsp), auth vectors frozen from the native library emulation, container layouts, media conversion and the 3 s cap, session flows against the simulators (still, animation, no packet CRC, retry after a failed packet, free-space refusal, memory refusal), CLI dry run output, and the no-vendor-calls check. Pitfall: a test GIF made of near-identical frames is merged by Pillow on save; make frames visibly different.
 

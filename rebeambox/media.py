@@ -101,26 +101,33 @@ def _run(cmd):
         raise MediaError("ffmpeg failed: " + e.stderr.decode("utf-8", "replace")[-400:])
 
 
-def avi_command(frames_pattern, fps, size, seconds, out_path, audio=None, ffmpeg="ffmpeg"):
-    """The documented builder command line (docs/PROTOCOL.md 3.6)."""
-    cmd = [ffmpeg, "-y", "-r", str(fps), "-i", frames_pattern]
+def avi_command(frames_pattern, fps, size, seconds, out_path, audio=None, ffmpeg="ffmpeg", height=None):
+    """The exact argument order of BadgeMediaFileBuilder.a (docs/PROTOCOL.md 3.6.1): fps and duration with three
+    decimals, mjpeg quality 5, avi container; with audio PCM 16 kHz mono and -shortest."""
+    h = height or size
+    vf = "scale=%d:%d:force_original_aspect_ratio=disable,setsar=1" % (size, h)
+    cmd = [ffmpeg, "-y", "-r", "%.3f" % fps, "-i", frames_pattern]
     if audio:
-        cmd += ["-i", audio]
-    cmd += ["-vf", "scale=%d:%d:force_original_aspect_ratio=disable,setsar=1" % (size, size),
-            "-c:v", "mjpeg", "-q:v", "5", "-t", "%g" % seconds]
-    if audio:
-        cmd += ["-map", "0:v:0", "-map", "1:a:0?", "-c:a", "pcm_s16le", "-ar", "16000", "-ac", "1", "-shortest"]
+        cmd += ["-i", audio, "-vf", vf, "-map", "0:v:0", "-map", "1:a:0?", "-c:v", "mjpeg", "-q:v", "5",
+                "-c:a", "pcm_s16le", "-ar", "16000", "-ac", "1", "-t", "%.3f" % seconds, "-shortest"]
     else:
-        cmd += ["-an"]
+        cmd += ["-vf", vf, "-c:v", "mjpeg", "-q:v", "5", "-t", "%.3f" % seconds, "-an"]
     return cmd + ["-f", "avi", out_path]
+
+
+def app_interval_ms(duration_ms, n_frames):
+    """a8.a.c in the app: interval = max(50, round(duration / frames)); 100 when there are no frames."""
+    if n_frames <= 0:
+        return 100
+    return max(50, round(max(1, duration_ms) / n_frames))
 
 
 def frames_to_avi(frames, fps, size=DEFAULT_SIZE, seconds=MAX_SECONDS, audio=None):
     """frames: list of PIL images (already square). Returns AVI bytes."""
     if not frames:
         raise MediaError("no frames")
-    fps = max(1, min(fps, 1000 // MIN_INTERVAL_MS))
-    seconds = min(seconds, len(frames) / fps)
+    fps = min(float(fps), 1000.0 / MIN_INTERVAL_MS)          # app: interval is at least 30 ms
+    seconds = len(frames) / fps if seconds is None else min(seconds, len(frames) / fps)
     with tempfile.TemporaryDirectory() as td:
         for i, f in enumerate(frames, 1):
             f.convert("RGB").save(os.path.join(td, "frame_%05d.jpg" % i), "JPEG", quality=90)
@@ -171,7 +178,7 @@ def load_video_frames(path, size=DEFAULT_SIZE, circular=True, fps=15, max_second
 
 def gif_to_avi(path, size=DEFAULT_SIZE, circular=True, max_seconds=MAX_SECONDS):
     frames, interval = load_gif_frames(path, size, circular, max_seconds)
-    return frames_to_avi(frames, 1000 // interval, size, max_seconds)
+    return frames_to_avi(frames, 1000.0 / interval, size, max_seconds)
 
 
 def video_to_avi(path, size=DEFAULT_SIZE, circular=True, fps=15, max_seconds=MAX_SECONDS, keep_audio=False):

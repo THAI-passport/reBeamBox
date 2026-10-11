@@ -27,10 +27,15 @@ def test_render_text_fits_inside_circle():
 def test_avi_command_matches_documented_builder():
     c = media.avi_command("f_%05d.jpg", 15, 360, 3, "o.avi")
     s = " ".join(c)
-    assert "-r 15 -i f_%05d.jpg" in s and "scale=360:360:force_original_aspect_ratio=disable,setsar=1" in s
-    assert "-c:v mjpeg -q:v 5 -t 3 -an -f avi o.avi" in s
+    assert "-r 15.000 -i f_%05d.jpg" in s and "scale=360:360:force_original_aspect_ratio=disable,setsar=1" in s
+    assert "-c:v mjpeg -q:v 5 -t 3.000 -an -f avi o.avi" in s
     a = " ".join(media.avi_command("f", 15, 360, 3, "o", audio="a.wav"))
-    assert "-c:a pcm_s16le -ar 16000 -ac 1 -shortest" in a
+    assert "-i f -i a.wav -vf" in a and "-map 0:v:0 -map 1:a:0? -c:v mjpeg -q:v 5 -c:a pcm_s16le -ar 16000 -ac 1 -t 3.000 -shortest -f avi o" in a
+
+
+def test_app_interval_rule_and_fractional_fps():
+    assert media.app_interval_ms(3000, 12) == 250 and media.app_interval_ms(1000, 100) == 50 and media.app_interval_ms(500, 0) == 100
+    assert " ".join(media.avi_command("f", 1000 / 30, 360, 1, "o")).count("-r 33.333") == 1
 
 def _gif(p, n=12, delay=100):
     fr = [Image.new("RGB", (64, 64), (i * 5, 0, 0)) for i in range(n)]

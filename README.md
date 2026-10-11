@@ -71,9 +71,21 @@ cd ui && python3 -m http.server 8000                             # Web Bluetooth
 - nn20 stills default to a one-frame type 5 container (interval 3000 ms); `--nn20-still album` sends type 6. Stills are cropped with a circular mask on black at the size the badge reports (360 or 368).
 - Details: ui/README.md, tools/replay_pcap.py header, docs/hardware-test-v1.md.
 
+## Fixtures, report aggregation, CI
+```
+python tools/make_fixtures.py [--check]           # synthetic btsnoop/pcapng captures in fixtures/captures (no vendor data)
+python tools/replay_pcap.py fixtures/captures/malformed.btsnoop    # reports bad checksums, CRC16 errors, sequence gaps
+python tools/aggregate_reports.py                 # reports/first-contact-*.md -> docs/compatibility-matrix.md (idempotent)
+python tools/check_repo_rules.py                  # fails on emoji, analytics hosts, non-local URLs in code
+```
+- `fixtures/captures/MANIFEST.md` describes the three synthetic scenarios (fragmented nn20 animation with ACKs, full RCSP auth session, malformed capture). They are generated from this repository's own builders and are not recordings of any badge.
+- `docs/compatibility-matrix.md` collects one row per first-contact report: device name, masked address, transport, MTU, accepted container (Type 5 or 6), verdict.
+- GitHub Actions (`.github/workflows/ci.yml`) runs on push and pull request to main with Python 3.10, 3.11 and 3.12: repo rules, fixture check, `pytest -q`, and the no-vendor-calls test again as an explicit step. Tests needing the native `libjl_auth.so` skip themselves in CI.
+- Sequence diagrams (Mermaid) for nn20, BadgeSdk/RCSP and the Wi-Fi camera are inline in `docs/PROTOCOL.md`.
+
 ## Tests
 ```
-python -m pytest -q                  # no hardware (202 pass, 1 skip); see docs/software-test-v1.md (larger auth fuzz: -m slow)
+python -m pytest -q                  # no hardware (250 pass, 1 skip); see docs/software-test-v1.md (larger auth fuzz: -m slow)
 ```
 
 ## Docs

@@ -306,3 +306,25 @@ Entry format: date, phase, problem, cause, solution (or Status: Unsolved plus wh
 - Problem: The browser API exposes no negotiated MTU, so P = min(446, mtu - 12) cannot be computed automatically.
 - Cause: Platform limitation.
 - Solution: MTU is an input (default 247) and is halved on a write error, up to three times. Hardware confirmation pending.
+
+
+## 44. Replay tool accepted malformed captures silently
+- Date: 2026-10-11
+- Phase: fixtures
+- Problem: A transfer with a bad checksum and a dropped packet was decoded as if complete, and the RCSP CRC16 detection used only the first chunk (a corrupted first chunk would flip detection).
+- Cause: The decoder only counted packets and tested the first chunk.
+- Solution: track the expected remaining counter (gaps), detect CRC16 presence from any valid chunk, report per-chunk CRC errors and sequence gaps as warnings, skip container decoding for incomplete transfers, never raise on corrupt containers. Covered by the malformed fixture.
+
+## 45. Fixture determinism
+- Date: 2026-10-11
+- Phase: fixtures
+- Problem: Generating test JPEGs with Pillow would change bytes between Pillow versions and break the committed fixtures.
+- Cause: JPEG encoder output is not stable across versions.
+- Solution: embed a fixed JPEG and derive frames by inserting a COM segment; timestamps are fixed; `make_fixtures.py --check` and a test compare committed files with a fresh generation.
+
+## 46. Docs legitimately name vendor hosts
+- Date: 2026-10-11
+- Phase: CI lint
+- Problem: A naive host-ban lint would flag the lint's own host list and its tests.
+- Cause: The rule needs the strings it forbids.
+- Solution: the lint script and its test are exempt from the host rules only (emoji still checked); code files additionally fail on any non-local URL. The repository currently contains no analytics host anywhere.

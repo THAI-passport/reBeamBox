@@ -51,6 +51,28 @@ async def scan(timeout=6.0, extra=(), all_devices=False):
         match = name_matches(name, extra) or (a is not None and a["tag"] == 0xB3)
         if match or all_devices:
             out.append({"name": name, "address": addr, "rssi": adv.rssi, "adv": a, "match": match,
-                        "services": [s for s in adv.service_uuids]})
+                        "services": [s for s in adv.service_uuids],
+                        "mfr": {("0x%04X" % k): v.hex() for k, v in adv.manufacturer_data.items()}})
     out.sort(key=lambda d: -(d["rssi"] or -999))
+    return out
+
+
+async def probe(address, timeout=15.0):
+    """Connect and list every service, characteristic, property and readable value (like an nRF Connect export)."""
+    from bleak import BleakClient
+    out = []
+    async with BleakClient(address, timeout=timeout) as c:
+        out.append({"mtu": getattr(c, "mtu_size", None)})
+        for svc in c.services:
+            item = {"service": str(svc.uuid), "characteristics": []}
+            for ch in svc.characteristics:
+                e = {"uuid": str(ch.uuid), "properties": list(ch.properties), "handle": ch.handle,
+                     "descriptors": [str(d.uuid) for d in ch.descriptors]}
+                if "read" in ch.properties:
+                    try:
+                        e["value"] = bytes(await c.read_gatt_char(ch)).hex()
+                    except Exception as ex:
+                        e["value_error"] = str(ex)
+                item["characteristics"].append(e)
+            out.append(item)
     return out

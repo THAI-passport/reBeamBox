@@ -33,6 +33,8 @@ def build_parser():
     s.add_argument("--timeout", type=float, default=8.0)
     s.add_argument("--all", action="store_true", help="show every device")
     s.add_argument("--model", choices=sorted(models.PROFILES))
+    p = sub.add_parser("probe", help="connect and dump GATT services (use for the first-session record)")
+    p.add_argument("address"); p.add_argument("--json", help="also write the dump to this file")
     p = sub.add_parser("send-image", help="send a JPG/PNG still"); p.add_argument("path"); _add_common(p)
     p.add_argument("--quality", type=int, default=90)
     p = sub.add_parser("send-gif", help="send an animated GIF"); p.add_argument("path"); _add_common(p)
@@ -187,8 +189,17 @@ def main(argv=None):
                 a = d["adv"]
                 extra = " %s/%s" % (a["kind"], a["shape"]) if a else ""
                 print("%s  %-24s rssi %s%s%s" % (d["address"], d["name"], d["rssi"], extra, "" if d["match"] else "  (no match)"))
+                print("    services: %s  manufacturer: %s" % (", ".join(d["services"]) or "-", d["mfr"] or "-"))
             if not res:
                 print("no badges found")
+            return 0
+        if args.cmd == "probe":
+            import json
+            res = asyncio.run(scanmod.probe(args.address))
+            text = json.dumps(res, indent=2)
+            print(text)
+            if args.json:
+                open(args.json, "w").write(text)
             return 0
         return asyncio.run(_run_send(args))
     except media.MediaError as e:

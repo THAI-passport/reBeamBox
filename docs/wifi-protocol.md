@@ -62,7 +62,7 @@ Frame format [C]:
 4. Wait 10 ms, then send the body in 6144-byte chunks with a flush after each. Sleep after each chunk: 3 ms while more than 102400 bytes remain, 2 ms while more than 51200, else 1 ms. On a socket exception the app reconnects once and resends the header.
 5. Read the response for up to 3 s. A reply containing `200`, `204` or starting `OK` is success. No reply is treated as success.
 6. Control: `00 5F`, close the control socket.
-- [C] An OkHttp based uploader (`HttpUploader`) also exists with `POST http://192.168.8.1/upload` (port 80, same `X-Filename` header, resume support for a previous partial upload through an `X-Offset`-like request body wrapper). It appears unused by the current screens [I]. If the TCP 8080 path fails, port 80 is the first alternative to try.
+- [C] An OkHttp based uploader (`HttpUploader`) also exists with `POST http://192.168.8.1/upload` (port 80, same `X-Filename` header, resume support: a `Content-Range: bytes <start>-<end>/<total>` header and a saved offset). It appears unused by the current screens [I]. If the TCP 8080 path fails, port 80 is the first alternative to try.
 - [U] Maximum file size and what the badge does with a duplicate file name.
 - Image formats: a still is a JPEG inside the IMB container, 360 x 360, circular crop done by the app. Animations are JPEG frames inside the container (see PROTOCOL.md 3.6), not AVI. The AVI path in the BLE BadgeSdk is a separate product line.
 

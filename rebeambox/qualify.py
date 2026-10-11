@@ -155,6 +155,7 @@ def render_report(res):
     L.append("  manufacturer data: %s" % (ad.get("mfr") or "-"))
     L.append("  MTU: %s   data bytes per nn20 packet: %s" % (res.get("mtu"), nn20.data_per_packet(res["mtu"]) if res.get("mtu") else "-"))
     L.append("  transport decision: %s" % res.get("transport"))
+    L.append("  accepted container (type 5 or type 6): not tested (run H2, then write 'accepted container: type 5' or 'type 6')")
     L.append("  handshake: %s -> %s" % (hs.get("kind", "not run"), "ok" if hs.get("ok") else "no reply"))
     L.append("PASS / FAIL / PARTIAL:       %s" % v)
     L.append("observations (display, sound, reboot, disconnect): %s" % (res.get("observations") or "(fill in what the badge did)"))

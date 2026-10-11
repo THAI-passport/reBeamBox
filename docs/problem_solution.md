@@ -358,3 +358,11 @@ Entry format: date, phase, problem, cause, solution (or Status: Unsolved plus wh
 - Problem: How does the badge tell a 2-byte frame length from the stop word 0x007F (entry 37)?
 - Cause: The app sends no type byte; stop is `00 7F 00 00`, the same shape as a frame with length 127. Firmware cannot be read from the APK.
 - Solution: Code review shows all control words have a zero high byte (frame length below 256) and the app never sends such a small frame. Inferred rule: first byte 0x00 means command. Client now pads frames below 256 bytes with a JPEG comment segment (`wifi.pad_jpeg`). Status: firmware rule Unknown; resource strings give no model-to-Wi-Fi mapping (wifi-protocol.md 5.2).
+
+
+## 51. Native libraries hold no badge limits
+- Date: 2026-10-11
+- Phase: native pass 3
+- Problem: Looked for frame size, packet size or storage limits in libjl_fatfs, libjl_pack_format, libjl_enc, libjl_ota_auth, libcbuf and the FFmpeg kit.
+- Cause: Those libraries serve watch-face tooling, OTA and audio; the badge picture limits are Java constants.
+- Solution: Documented constants (FatFs sector 512, mkfs unit 4096, FFmpeg n6.0 with mjpeg and avi) in binaries.md; found unexplored RCSP storage commands (browse, delete, format) in the SDK and recorded their ids in PROTOCOL.md 3.7.2 as Unknown payloads.

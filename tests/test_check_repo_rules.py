@@ -102,12 +102,8 @@ def test_cli_exit_codes_and_output(tmp_path, capsys):
 
 
 def _read_ci():
-    """The workflow lives in .github/workflows/ci.yml; it is staged in ci/ci.yml until the push token has the workflow scope."""
-    for rel in ((".github", "workflows", "ci.yml"), ("ci", "ci.yml")):
-        p = os.path.join(ROOT, *rel)
-        if os.path.exists(p):
-            return open(p).read()
-    raise AssertionError("no CI workflow file found")
+    """The workflow lives in .github/workflows/ci.yml."""
+    return open(os.path.join(ROOT, ".github", "workflows", "ci.yml")).read()
 
 
 def test_ci_workflow_has_required_steps():

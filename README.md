@@ -84,7 +84,7 @@ python tools/check_repo_rules.py                  # fails on emoji, analytics ho
 ```
 - `fixtures/captures/MANIFEST.md` describes the three synthetic scenarios (fragmented nn20 animation with ACKs, full RCSP auth session, malformed capture). They are generated from this repository's own builders and are not recordings of any badge.
 - `docs/compatibility-matrix.md` collects one row per first-contact report: device name, masked address, transport, MTU, accepted container (Type 5 or 6), verdict.
-- GitHub Actions workflow (staged as `ci/ci.yml` because the push token lacks the `workflow` scope; copy it to `.github/workflows/ci.yml` to activate it) runs on push and pull request to main with Python 3.10, 3.11 and 3.12: repo rules, fixture check, `pytest -q`, and the no-vendor-calls test again as an explicit step. Tests needing the native `libjl_auth.so` skip themselves in CI.
+- GitHub Actions workflow (`.github/workflows/ci.yml`) runs on push and pull request to main with Python 3.10, 3.11 and 3.12: repo rules, fixture check, `pytest -q`, and the no-vendor-calls test again as an explicit step. Tests needing the native `libjl_auth.so` skip themselves in CI.
 - Sequence diagrams (Mermaid) for nn20, BadgeSdk/RCSP and the Wi-Fi camera are inline in `docs/PROTOCOL.md`.
 
 ## Tests

@@ -41,4 +41,6 @@ def test_reply_parser():
     assert len(out) == 2 and "GetPacketSuccess" in out[0][1] and rest == b""
 
 def test_guard_time():
-    assert nn20.guard_time_ms(1) == 1600 and nn20.guard_time_ms(5000) == 3000
+    # smali: min(ceil(N/1000) * 300 + 800, 3000)
+    assert nn20.guard_time_ms(1) == 1100 and nn20.guard_time_ms(1000) == 1100 and nn20.guard_time_ms(1001) == 1400
+    assert nn20.guard_time_ms(5000) == 2300 and nn20.guard_time_ms(9000) == 3000 and nn20.guard_time_ms(0) == 800

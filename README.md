@@ -89,7 +89,7 @@ python tools/check_repo_rules.py                  # fails on emoji, analytics ho
 
 ## Tests
 ```
-python -m pytest -q                  # no hardware (250 pass, 1 skip); see docs/software-test-v1.md (larger auth fuzz: -m slow)
+python -m pytest -q                  # no hardware, CI runs the same; see docs/software-test-v1.md (larger auth fuzz: -m slow)
 ```
 
 ## Docs
@@ -102,7 +102,10 @@ python -m pytest -q                  # no hardware (250 pass, 1 skip); see docs/
 - docs/FACTS.md: one fact sheet for screen sizes, picture size, transports, chip and limits
 - docs/pulse.md: Pulse-specific findings and how the client handles them
 - docs/ads-removal.md: how the original app shows promotions, and that this client has none
-- docs/SOP.md: reverse engineering procedure
+- AGENTS.md: rules for AI agents working in this repo (also read fixes.md and docs/problem_solution.md first)
+- fixes.md: open and fixed issues
+- docs/review-critique-2026-10.md: critique of an external review
+- docs/SOP.md: reverse engineering procedure (a generalized, target-agnostic version lives in the reWork repo)
 - docs/app-behaviour.md, docs/binaries.md: app and binary notes
 - docs/problem_solution.md: running log of problems and solutions
 - docs/hardware-prediction.md, docs/streaming-plan.md: streaming design

@@ -6,6 +6,8 @@ Method: static reading of the decompiled app (jadx) plus smali for methods jadx 
 - [I] Inferred (reasoned from code but not directly shown)
 - [S] Speculative
 
+Tag mapping to the repo-wide scheme (AGENTS.md, docs/FACTS.md): [C] = [C], [I] = [I], [S] = [U]. [W] third-party, [V] emulator-verified and [H] hardware-confirmed are also used where they apply.
+
 Worked-example bytes come from `scripts/spec_vectors.py`, which only implements the formulas below. No app source or assets are copied.
 
 ## 0. The app contains THREE transports, selected by device name

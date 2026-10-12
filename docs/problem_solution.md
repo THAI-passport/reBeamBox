@@ -425,3 +425,10 @@ Entry format: date, phase, problem, cause, solution (or Status: Unsolved plus wh
 - Problem: Safe-write only warned about high daily counts, so a loop could still wear out flash.
 - Cause: Policy was warnings plus a minimum interval only.
 - Solution: Hard cap of 50 writes per badge per rolling 24 hours (`--max-per-day`, 0 disables, `--force` overrides), `CapReached` is a `Blocked` subclass so the CLI exits 2. The default warning threshold moved from 100 to 40 so the warning comes before the cap. Status: Solved.
+
+## 60. Agent rules lived only in prose and a mislabelled review file
+- Date: 2026-10-12
+- Phase: documentation
+- Problem: No AGENTS.md or fixes list existed, so agent rules (safe-write, no vendor artifacts, log upkeep) lived only in the SOP and README. A README test count had drifted again, and the critique of an external review sat in a file named `haiku5.5-is-garbage.md`.
+- Cause: Rules were written as procedure, not as instructions an agent loads at session start.
+- Solution: Added AGENTS.md, CLAUDE.md and fixes.md; removed the README test count; renamed the critique to `docs/review-critique-2026-10.md`; added a tag-mapping note to PROTOCOL.md. Status: Solved. Hardware testing is still open (see fixes.md).

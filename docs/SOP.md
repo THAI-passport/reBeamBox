@@ -99,6 +99,9 @@ nohup bash -c 'S=$(date +%s); jadx -j 4 -d analysis/decompiled analysis/work/<pa
 - Tests: `tests/test_rebuild_analysis.py` uses a fake XAPK, fake jadx and `--local-file`, so no network or real tools are needed. The real run was verified on the box with the real hashes (they match SOURCES.md); the network download path itself is unverified in tests.
 - New target: copy `analysis/sources.env`, change the values, run with `--accept-new-hash` once to learn the hashes, then record them.
 
+## 9.3 Pinning rule
+Pin by exact version and SHA-256, never by a floating link. After the first validated download record version, hashes, a versioned or mirrored URL (`URL2`) and where the owner keeps the exact copy (`COPY_LOCATION`, no secrets). A rebuild verifies and refuses on mismatch (exit 3). A vendor release is a NEW pinned entry with its own version and hashes (for example a second sources file); do not edit the old hash. `--accept-new-hash` is inspection only: it prints the new hash, pins nothing, and the user must be told. The script warns when every URL is a 'latest' link or `COPY_LOCATION` is missing.
+
 ## 9.2 Rebuild policy and what to record after a pass
 When to rebuild `analysis/` (new instance, new session): only when a specific question needs the code. First grep PROTOCOL.md, FACTS.md, this SOP and problem_solution.md; then check `analysis/decompiled` and `analysis/BUILD-INFO.txt`; rebuild only for a claim tagged `[I]`/`[U]`, a new app version, or a contradiction; `--dry-run` first; state the reason in the commit.
 Mechanics (all in `scripts/rebuild_analysis.py`):

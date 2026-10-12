@@ -495,3 +495,10 @@ Entry format: date, phase, problem, cause, solution (or Status: Unsolved plus wh
 - Problem: a fresh agent's default is to rebuild and decompile, which costs a 72 MB download and a jadx run and often answers nothing new; and findings from a pass were not always written back, so the next pass repeated it.
 - Cause: no rule said when to rebuild, and no rule said what to record afterwards.
 - Solution: AGENTS.md "Rebuild only when necessary" (grep the docs, check for an existing tree, rebuild only for `[I]`/`[U]` claims, new versions or contradictions, `--dry-run` first, state the reason) and "After every decompile pass" (PROTOCOL, FACTS, SOP, problem log in the same commit); SOP 9.2. Status: Solved as process; relies on agents following it.
+
+## 70. Hash pinned, but only by a floating latest link
+- Date: 2026-10-12
+- Phase: reproducibility
+- Problem: the only URL for the app is a floating "latest" link, so a vendor update changes the file while the pinned hash stays; a rebuild then fails, and `--accept-new-hash` could be used to move on without a record.
+- Cause: the pin was a hash plus a floating URL; no rule asked for a versioned URL, an owner-controlled copy or a new entry per release.
+- Solution: AGENTS.md pinning rule, `COPY_LOCATION` in sources.env, warnings from the rebuild script when all URLs float or the copy location is missing, clearer mismatch and accept messages, SOP 9.3, tests. The APKPure link is still floating; no versioned or mirrored URL is known yet, so the owner-controlled copy is the real pin. Status: Mitigated.

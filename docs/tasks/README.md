@@ -1,5 +1,7 @@
 # Recon task pack (software and hardware)
 
+Start with [QUICKSTART.md](QUICKSTART.md): a one-page table that tells you which tasks apply to you. You do not need to read this whole pack.
+
 Written for an AI agent or a person who has not seen this project before. Follow it literally. Where it is silent, make an assumption using the policy below, write it down, and keep going.
 
 Context in one paragraph: reBeamBox is an open Python client for Beambox-style round e-badges (NIKKO = Pulse, NANO, NIJI) over BLE (and possibly Wi-Fi). It was written from static analysis of the vendor Android app. Nothing has been confirmed on a real badge yet. The two jobs are: (1) squeeze the remaining certainty out of the app code (software recon, no hardware), and (2) run a controlled first contact with a real badge (hardware recon). Evidence tags used everywhere: `[C]` confirmed in app code, `[V]` verified by emulation or test vector, `[H]` confirmed on a real badge, `[W]` third-party claim, `[I]` inferred, `[U]` unknown.
@@ -7,6 +9,7 @@ Context in one paragraph: reBeamBox is an open Python client for Beambox-style r
 ## Files in this pack
 | File | Purpose |
 |---|---|
+| `QUICKSTART.md` | One page: which tasks apply to your situation, and ten rules |
 | `SW-RECON.md` | Tasks S0 to S11. No hardware, no Bluetooth. An AI can do all of them in a normal sandbox. |
 | `HW-RECON.md` | Tasks HW-0 to HW-17. Need a physical badge and a machine with Bluetooth. |
 | `ASSUMPTIONS.md` | Pre-made assumptions (so you never stop to ask) and the log where you add yours. |

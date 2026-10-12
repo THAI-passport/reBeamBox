@@ -444,8 +444,8 @@ Entry format: date, phase, problem, cause, solution (or Status: Unsolved plus wh
 - Date: 2026-10-12
 - Phase: reproducibility
 - Problem: Running the rebuild script in the foreground got "Killed" (exit 137) after about 60 s and the script recorded a failed jadx run.
-- Cause: The agent shell limits foreground commands; it was not an out-of-memory kill (9 GB free).
-- Solution: Run it with nohup in the background and read the log. The script never treats a killed jadx as success (exit 137 is reported and the marker is not accepted). Status: Solved.
+- Cause: Memory pressure on the shared box: jadx stalled at 75 percent and the process was killed (reproduced three times, also when detached). A run with `JAVA_OPTS=-Xmx3g` finished in about 45 s.
+- Solution: Cap the heap with `JAVA_OPTS=-Xmx3g` when memory is tight and run detached (`setsid nohup ... &`). The script never treats a killed jadx as success (exit 137 is reported and the marker is not accepted). Status: Solved.
 
 ## 63. Version query failed silently under set -e
 - Date: 2026-10-12

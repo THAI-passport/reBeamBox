@@ -49,7 +49,6 @@ done < "$SOURCES"
 for k in PACKAGE VERSION XAPK_NAME XAPK_SHA256 BASE_APK_NAME BASE_APK_SHA256; do
   [ -n "${S[$k]:-}" ] || die 2 "$SOURCES: missing $k"
 done
-[ -n "$LOCAL" ] || [ -n "${S[URL]:-}" ] || die 2 "$SOURCES: missing URL (or pass --local-file)"
 for k in XAPK_SHA256 BASE_APK_SHA256 ABI_APK_SHA256; do
   [ -z "${S[$k]:-}" ] || [[ "${S[$k]}" =~ ^[0-9a-f]{64}$ ]] || die 2 "$SOURCES: $k is not a lowercase 64-digit sha256"
 done
@@ -85,6 +84,7 @@ if [ -n "$LOCAL" ]; then
 elif [ -f "$XAPK" ] && [ "$FORCE" = 0 ]; then
   SRC_FILE="$XAPK"; say "archive already present: $XAPK"
 else
+  [ -n "${S[URL]:-}" ] || die 2 "$SOURCES: no URL and archive not present (add URL or pass --local-file)"
   command -v curl >/dev/null || die 4 "curl is required to download (or pass --local-file)"
   say "download ${S[URL]}"
   run mkdir -p "$A/apk"

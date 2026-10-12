@@ -467,3 +467,10 @@ Entry format: date, phase, problem, cause, solution (or Status: Unsolved plus wh
 - Problem: from a cloud container, `d.apkpure.com` and `api.adoptium.net` are unreachable and github release URLs return 403, so a rebuild stops at the download.
 - Cause: the environment network policy allows package managers and a short list of hosts.
 - Solution: add the hosts under Allowed domains in the environment settings, or pass `--local-file`. Status: needs the user.
+
+## 66. Recon checklists could not be executed by a newcomer
+- Date: 2026-10-12
+- Phase: documentation and tooling
+- Problem: `hardware-recon-checklist.md` mixed procedures, background and an external review; steps contradicted the tool behaviour (the H8 identical rewrite is skipped by the delta guard, the 30 s interval and 50 per day cap were not budgeted), the free space number was not printed anywhere, test media and a passive notification logger did not exist, the FCC ID spelling was wrong in one place, and nothing said who may do which step (a cloud sandbox has no Bluetooth).
+- Cause: the checklist was written before the safe-write policy and the first-contact tooling.
+- Solution: new task pack `docs/tasks/` with per-task executor, write cost, exact commands, interpretation tables, stop conditions and an assumption policy; `tools/make_test_media.py`, `tools/notify_log.py`; the nn20 session now logs every status JSON (`badge status:` line, `Nn20Session.status_log`). Status: Solved in documentation; untested by a second agent and by hardware.

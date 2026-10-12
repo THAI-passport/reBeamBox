@@ -1,5 +1,7 @@
 # Hardware Reconnaissance and Flash Endurance Checklist
 
+> Executable version: the step-by-step task pack in [tasks/README.md](tasks/README.md) (software tasks S0 to S11 in `tasks/SW-RECON.md`, hardware tasks HW-0 to HW-17 in `tasks/HW-RECON.md`) supersedes the procedures below for day-to-day work; this document stays as background for the teardown and flash-endurance reasoning. Known corrections: the only FCC spelling that exists is `2BR3T-BAGDE0`; a discrete SOIC flash may not exist (flash reported inside the SoC package); the H8 rewrite test needs `--no-delta`.
+
 > Cross-reference (added 2026-10): public findings that overlap this checklist are collected in [recon-web.md](recon-web.md) (FCC filing contents, chip and flash reports from third-party teardowns, firmware layout). On fccid.io only `2BR3T-BAGDE0` exists; `2BR3T-BADGE0` returned 404, so treat it as a spelling variant. The filing lists a Bluetooth band only (no Wi-Fi) and keeps the block diagram, schematic and parts list confidential.
 
 Audience: Embedded engineers and autonomous agents working with physical Beambox hardware.

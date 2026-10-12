@@ -10,3 +10,5 @@ analysis/jadx.done
 reports/*
 !reports/README.md
 analysis/BUILD-INFO.txt
+testmedia/
+dumps/

@@ -69,3 +69,16 @@ Reports range from 450 to 500 mAh for Nikko and 500 mAh at 3.8 V for Niji [W]; r
 ## 7. Client safety defaults
 
 Minimum 30 s between writes, warning above 40 writes in 24 hours, hard cap 50 writes in 24 hours per badge, warning above 10000 writes in total. All configurable; see docs/safe-write.md.
+
+## 8. Tooling environment facts (not badge facts)
+
+Measured on the development machines; dated because they can change.
+
+| Item | Value | Evidence | Date |
+|---|---|---|---|
+| Hosts reachable from a cloud session | repo1.maven.org yes; d.apkpure.com, api.adoptium.net no; github.com release downloads 403 | HEAD requests from a cloud container [C, own measurement] | 2026-10-12 |
+| nn20 payload for `testmedia/noise.png` (model nikko, type 5) | about 83 KB | client dry run [V, own measurement of our test image, not a badge fact] | 2026-10-12 |
+| nn20 payload for `testmedia/photo.jpg` | about 17 KB | same | 2026-10-12 |
+| nn20 payload for a solid 800x800 red image | about 9 KB | same | 2026-10-12 |
+| jadx memory | killed at about 75 percent on a shared box without a heap cap; finishes in about 45 s with `-Xmx3g` | problem_solution.md entry 62 | 2026-10-12 |
+| Vendor download URL | `?version=latest` moves; use URL2 for a pinned mirror | rebuild script behaviour | 2026-10-12 |

@@ -89,6 +89,28 @@ nohup bash -c 'S=$(date +%s); jadx -j 4 -d analysis/decompiled analysis/work/<pa
 - Code is R8-obfuscated (single letter packages such as a/, o7/, p7/), but the vendor package com.example.nn20 keeps many names. Resources decoded to analysis/decompiled/resources (use that AndroidManifest.xml, which is readable).
 - Companion docs: docs/app-behaviour.md (screens, flows, permissions) and docs/binaries.md (APK, splits, native libraries). Write both from the manifest, jadx tree, and `unzip -l` of each split.
 
+## 9.1 Rebuilding analysis/ on another machine
+`scripts/rebuild_analysis.py` (Python; `rebuild-analysis.sh` wraps it) automates sections 3 to 9 from `analysis/sources.env` (machine-readable twin of `analysis/SOURCES.md`; a test checks that the hashes agree).
+- Order: parse sources (parsed, never executed) -> download or `--local-file` -> verify XAPK sha256 -> extract base APK and ABI split -> verify both -> check pinned jadx and Java -> `jadx -j 4` into `analysis/decompiled` (exit 0 and 3 are both fine) -> optional `--recover` -> `analysis/BUILD-INFO.txt` (git-ignored).
+- Safety: a mismatch exits 3 and writes nothing further. `--accept-new-hash` prints the actual hash and continues but edits no file; you decide whether to update `sources.env` and `SOURCES.md`. Extracted files are re-verified on every run and re-extracted from the verified archive if they differ.
+- Idempotent: a verified archive, verified extracted APKs and a `jadx.done` marker carrying the base APK hash are skipped; `--force` redoes everything and downgrades a tool-version mismatch to a warning. `--dry-run` shows the plan.
+- Memory: on a busy shared machine jadx can be killed (exit 137); run with `JAVA_OPTS=-Xmx3g`, detached.
+- Pins: jadx 1.5.6 and Java 17 are checked; `setup-tools.sh` installs jadx and apktool at pinned versions (override with `JADX_VERSION`, `APKTOOL_VERSION`). The JDK download is still "latest 17" with no hash.
+- Tests: `tests/test_rebuild_analysis.py` uses a fake XAPK, fake jadx and `--local-file`, so no network or real tools are needed. The real run was verified on the box with the real hashes (they match SOURCES.md); the network download path itself is unverified in tests.
+- New target: copy `analysis/sources.env`, change the values, run with `--accept-new-hash` once to learn the hashes, then record them.
+
+## 9.3 Pinning rule
+Pin by exact version and SHA-256, never by a floating link. After the first validated download record version, hashes, a versioned or mirrored URL (`URL2`) and where the owner keeps the exact copy (`COPY_LOCATION`, no secrets). A rebuild verifies and refuses on mismatch (exit 3). A vendor release is a NEW pinned entry with its own version and hashes (for example a second sources file); do not edit the old hash. `--accept-new-hash` is inspection only: it prints the new hash, pins nothing, and the user must be told. The script warns when every URL is a 'latest' link or `COPY_LOCATION` is missing.
+
+## 9.2 Rebuild policy and what to record after a pass
+When to rebuild `analysis/` (new instance, new session): only when a specific question needs the code. First grep PROTOCOL.md, FACTS.md, this SOP and problem_solution.md; then check `analysis/decompiled` and `analysis/BUILD-INFO.txt`; rebuild only for a claim tagged `[I]`/`[U]`, a new app version, or a contradiction; `--dry-run` first; state the reason in the commit.
+Mechanics (all in `scripts/rebuild_analysis.py`):
+- Several download URLs: `URL`, `URL2`, `URL3`, `URL4` in `analysis/sources.env` are tried in order; the first whose file matches the pinned SHA-256 is used. Use this for a versioned mirror or a private copy next to the vendor "latest" link.
+- A hash mismatch prints what version the downloaded XAPK says it is (manifest.json) against the pinned version. If they differ the vendor published a new release: do not accept it silently; re-run the claim audit (docs/tasks/SW-RECON.md S2) on the new version.
+- `--local-file PATH` for a file you were given; `--url URL` to override the download; `--max-heap 3g` for small machines (the default applies 3g under 8 GiB RAM); exit codes 0 ok, 2 usage, 3 hash mismatch, 4 tool problem, 5 step failed.
+- Network: in a cloud session the hosts d.apkpure.com, data.winudf.com, api.adoptium.net and github.com may be blocked (checked 2026-10-12: apkpure and adoptium unreachable, github releases 403, maven central reachable). Ask the owner to allow them or supply the file.
+After every pass record, in the same commit: PROTOCOL.md (finding, tag, source class.method, no code), FACTS.md (disputed values), this SOP (procedure, tool flags, dead ends), problem_solution.md (problem, cause, solution or Unsolved).
+
 ## 10. Phase: locate BLE UUIDs
 Method used (all greps from analysis/decompiled/sources):
 1. Find GATT users: `grep -rlE "BluetoothGattCallback|writeCharacteristic|requestMtu" --include=*.java .`. Many hits are bundled SDKs (here Jieli, com.jieli.*). Separate vendor code from SDK code by package.
@@ -179,6 +201,14 @@ Keep the runtime small and make heavy or native-build packages opt-in: core depe
 - Checking docs against code finds real bugs (here: `--model` overrode the badge-reported size).
 - CI lives in `.github/workflows/ci.yml`; a token needs the `workflow` scope to push it.
 - Safe-write has a hard daily cap (50 per badge per 24 h) besides warnings.
+
+## 13.6 Recon task pack and hardware session mechanics
+The step-by-step tasks live in `docs/tasks/` (start at QUICKSTART.md). What was learned while writing them, so it is not rediscovered:
+1. The safe-write guard and the rewrite test collide: an identical resend is skipped by design, so the free-space test (HW-7) needs `--no-delta`, the 30 s interval respected, and counts toward the 50 per day cap. Budget the day's writes before the first one.
+2. The badge's free space is only visible through the status JSON it pushes on 0x01F2. The nn20 session now logs every push as a `badge status:` line and keeps them in `Nn20Session.status_log`; `probe --qualify` reads it read-only after a reconnect.
+3. A cloud sandbox has no Bluetooth: hardware tasks need a person; the agent prepares the run sheet and interprets pasted output.
+4. A checklist that names a flag that does not exist wastes a hardware session. `tests/test_task_pack_commands.py` parses every `rebeambox ...` command and every `python tools/...` path in `docs/tasks/` and fails on an unknown subcommand, flag or script. Run it whenever the pack or the CLI changes.
+5. Test media (`tools/make_test_media.py`) and the passive logger (`tools/notify_log.py`) exist so first contact needs no ad hoc scripts.
 
 ## 14. Reporting checklist
 - Update docs/problem_solution.md with any new problem

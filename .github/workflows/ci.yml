@@ -53,3 +53,20 @@ jobs:
 
       - name: No vendor calls (explicit)
         run: pytest -q tests/test_no_vendor_calls.py
+
+  portable:
+    # macOS and Windows: only the parts that must run there (scripts, repo rules); the full suite needs ffmpeg and Node
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install --upgrade pip
+      - run: pip install -e ".[test]"
+      - run: python tools/check_repo_rules.py
+      - run: pytest -q tests/test_rebuild_analysis.py tests/test_setup_tools.py tests/test_check_repo_rules.py

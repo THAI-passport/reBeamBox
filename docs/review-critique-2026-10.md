@@ -1,4 +1,4 @@
-# Critique of the Haiku 5.5 review of reBeamBox
+# Critique of an external AI review of reBeamBox
 
 Subject: docs/for-grok-improvements.md on branch docs/grok-improvements (reviewed main at commit edf68f4, dated 2026-10-12).
 

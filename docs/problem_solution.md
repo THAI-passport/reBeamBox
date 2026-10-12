@@ -474,3 +474,24 @@ Entry format: date, phase, problem, cause, solution (or Status: Unsolved plus wh
 - Problem: `hardware-recon-checklist.md` mixed procedures, background and an external review; steps contradicted the tool behaviour (the H8 identical rewrite is skipped by the delta guard, the 30 s interval and 50 per day cap were not budgeted), the free space number was not printed anywhere, test media and a passive notification logger did not exist, the FCC ID spelling was wrong in one place, and nothing said who may do which step (a cloud sandbox has no Bluetooth).
 - Cause: the checklist was written before the safe-write policy and the first-contact tooling.
 - Solution: new task pack `docs/tasks/` with per-task executor, write cost, exact commands, interpretation tables, stop conditions and an assumption policy; `tools/make_test_media.py`, `tools/notify_log.py`; the nn20 session now logs every status JSON (`badge status:` line, `Nn20Session.status_log`). Status: Solved in documentation; untested by a second agent and by hardware.
+
+## 67. Hash mismatch after a vendor release gave no clue why
+- Date: 2026-10-12
+- Phase: tooling
+- Problem: `analysis/sources.env` pins the XAPK hash but downloads from a `?version=latest` link. After a new release the rebuild stops with only two hashes, and a newcomer cannot tell a corrupt download from a new version. A second known-good source could not be configured.
+- Cause: one URL, no version information in the error.
+- Solution: `scripts/rebuild_analysis.py` now prints the version the downloaded XAPK reports (manifest.json) against the pinned version, and tries `URL`, `URL2`, `URL3`, `URL4` in order until one matches the pinned hash. Tests in `tests/test_rebuild_analysis.py`. Status: Solved. Open: nobody has recorded a versioned mirror yet, so `URL2` is empty (see fixes.md).
+
+## 68. Task pack mentioned flags that might not exist
+- Date: 2026-10-12
+- Phase: documentation
+- Problem: a step-by-step pack is only as good as its commands; a renamed flag would silently break a hardware session.
+- Cause: documentation and CLI evolve separately.
+- Solution: `tests/test_task_pack_commands.py` checks every `rebeambox` subcommand and flag and every `python tools/...` / `scripts/...` path mentioned in `docs/tasks/`. It was checked by injecting a bogus flag (the test failed as expected). Also added `docs/tasks/QUICKSTART.md` because the full pack is long and weaker agents skim. Status: Solved.
+
+## 69. A rebuild on a new instance repeated work the docs already held
+- Date: 2026-10-12
+- Phase: process
+- Problem: a fresh agent's default is to rebuild and decompile, which costs a 72 MB download and a jadx run and often answers nothing new; and findings from a pass were not always written back, so the next pass repeated it.
+- Cause: no rule said when to rebuild, and no rule said what to record afterwards.
+- Solution: AGENTS.md "Rebuild only when necessary" (grep the docs, check for an existing tree, rebuild only for `[I]`/`[U]` claims, new versions or contradictions, `--dry-run` first, state the reason) and "After every decompile pass" (PROTOCOL, FACTS, SOP, problem log in the same commit); SOP 9.2. Status: Solved as process; relies on agents following it.

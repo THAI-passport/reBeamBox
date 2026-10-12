@@ -224,3 +224,26 @@ def test_url_override_downloads_and_verifies(tmp_path):
     r = run(tmp_path, "--url", moved.as_uri(), path=fake_tools(tmp_path))
     assert r.returncode == 0, r.stderr
     assert (tmp_path / "analysis" / "apk" / "fake.xapk").is_file()
+
+
+def test_fallback_url_is_tried_when_first_download_has_wrong_hash(tmp_path):
+    xapk = make_repo(tmp_path, extra="")
+    good = tmp_path / "good.bin"
+    xapk.rename(good)
+    wrong = tmp_path / "wrong.bin"
+    wrong.write_bytes(b"a newer release")
+    env = tmp_path / "analysis" / "sources.env"
+    env.write_text(env.read_text().replace("URL=http://127.0.0.1:9/never", "URL=%s\nURL2=%s" % (wrong.as_uri(), good.as_uri())))
+    r = run(tmp_path, path=fake_tools(tmp_path))
+    assert r.returncode == 0, r.stderr
+    assert "trying the next URL" in r.stdout
+
+
+def test_mismatch_explains_the_version_in_the_downloaded_xapk(tmp_path):
+    make_repo(tmp_path)
+    newer = tmp_path / "newer.xapk"
+    with zipfile.ZipFile(newer, "w") as z:
+        z.writestr("manifest.json", '{"version_name": "9.9.9", "version_code": 99}')
+    r = run(tmp_path, "--local-file", str(newer))
+    assert r.returncode == 3
+    assert "9.9.9" in r.stderr and "pins version 1.0" in r.stderr

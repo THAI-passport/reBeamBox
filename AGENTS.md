@@ -8,6 +8,8 @@ Instructions for AI agents working in this repository (reBeamBox: an open Python
 - `docs/FACTS.md`: the single place for values sources disagree on (screen size, picture size, transports, chip, limits). Link to it; do not restate those values elsewhere.
 - `docs/PROTOCOL.md`: the byte-exact spec. If the code and the spec disagree, one of them is wrong; find out which and fix it in the same commit.
 
+- `docs/tasks/README.md`: the recon task pack (software and hardware). If you were asked to continue recon, start there; it tells you who does what, what to assume, and when to stop.
+
 ## Logs you maintain
 - Problem log: append to `docs/problem_solution.md` whenever you hit a problem or find a solution: what happened, the evidence, the cause, the fix, or "open" with what is needed. Same commit as the related change when practical.
 - Fixes list: add anything that needs fixing under Open in `fixes.md`; when fixed, move it to Fixed with what was wrong and what changed. Same commit as the change.

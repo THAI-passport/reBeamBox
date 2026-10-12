@@ -3,6 +3,7 @@
 Things that need fixing and things already fixed. Add to Open when you find something; move it to Fixed with what was wrong and what changed. Same commit as the change.
 
 ## Open
+- Recon task pack (`docs/tasks/`) is untried by a second agent; the first agent to use it should record where it tripped here.
 - Hardware: nothing is confirmed on a real badge. Run `rebeambox probe --qualify --model nikko`, then follow `docs/first-session-checklist.md`. Every `[I]`/`[S]` claim in `docs/PROTOCOL.md` waits on this.
 - `scripts/setup_tools.py` pins jadx and apktool versions and verifies SHA-256 only when `JADX_SHA256`/`APKTOOL_SHA256` are set (it prints the computed hashes); the JDK is the latest 17. Pin real hashes once a machine with github access has downloaded them.
 - Windows and macOS are untested locally: CI covers them, the JDK bundle layout is unit tested, a real jadx run there has not happened.
@@ -12,6 +13,7 @@ Things that need fixing and things already fixed. Add to Open when you find some
 - tshark is not available without root (problem_solution.md entry 2); capture analysis relies on `tools/replay_pcap.py`.
 
 ## Fixed
+- The hardware checklist could not be run as written (the H8 rewrite test hit the identical-payload skip, free space was never printed, no passive notification logger, no test media, wrong FCC spelling, no write budget): added `docs/tasks/` (S0 to S11, HW-0 to HW-17, assumptions, status), `tools/make_test_media.py`, `tools/notify_log.py`, and a `badge status:` log line from the nn20 session.
 - Rebuild and setup were bash-only (`sha256sum`, `declare -A`, linux-x64 JDK URL), so they failed on macOS (bash 3.2) and Windows: rewrote them in Python 3 standard library (`rebuild_analysis.py`, `setup_tools.py`), kept the .sh files as wrappers, added OS/arch detection, the macOS JDK bundle layout, a zsh PATH line, `apktool.bat`, and tests.
 - jadx was OOM-killed on small machines and the cap lived only in the problem log: `--max-heap`/`JADX_HEAP`, default 3g under 8 GiB RAM, and an OOM kill now says so. `--url` overrides the download URL.
 - Analysis files could not be rebuilt away from the original machine by script: added `scripts/rebuild-analysis.sh` and `analysis/sources.env` (hash-verified, idempotent, `--dry-run`, `--force`, `--recover`), jadx and apktool pinned in setup-tools.

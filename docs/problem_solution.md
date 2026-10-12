@@ -453,3 +453,17 @@ Entry format: date, phase, problem, cause, solution (or Status: Unsolved plus wh
 - Problem: With a broken jadx on PATH the script exited 1 with no message.
 - Cause: A failing command inside `$(... | head -1)` with pipefail ended the script before the pin check.
 - Solution: Version lookups end with `|| true`, so the pin check reports the mismatch with exit 4. Status: Solved.
+
+## 64. Rebuild and setup scripts were bash-only
+- Date: 2026-10-12
+- Phase: tooling
+- Problem: `rebuild-analysis.sh` used `sha256sum` and `declare -A`; `setup-tools.sh` fetched linux/x64 only and edited only `~/.bashrc`. On macOS (bash 3.2, no `sha256sum`) and Windows they did not run, although AGENTS.md listed macOS as supported.
+- Cause: bash chosen for convenience; GNU userland assumed.
+- Solution: reimplemented both in Python 3 standard library (`scripts/rebuild_analysis.py`, `scripts/setup_tools.py`); the `.sh` files are wrappers. The 18 existing tests passed unchanged against the port before new ones were added (heap option, `--url`, setup URLs and the macOS JDK bundle layout). Also added `--max-heap` (default 3g under 8 GiB RAM) and `--url`. Status: Solved for Linux (tested here); macOS and Windows are covered by CI and unit tests only.
+
+## 65. Cloud session cannot reach the download hosts
+- Date: 2026-10-12
+- Phase: tooling
+- Problem: from a cloud container, `d.apkpure.com` and `api.adoptium.net` are unreachable and github release URLs return 403, so a rebuild stops at the download.
+- Cause: the environment network policy allows package managers and a short list of hosts.
+- Solution: add the hosts under Allowed domains in the environment settings, or pass `--local-file`. Status: needs the user.

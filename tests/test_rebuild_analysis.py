@@ -194,3 +194,13 @@ def test_repo_sources_file_matches_sources_md():
 
 def test_build_info_is_git_ignored():
     assert "analysis/BUILD-INFO.txt" in open(os.path.join(ROOT, ".gitignore")).read()
+
+
+def test_missing_url_only_matters_when_a_download_is_needed(tmp_path):
+    xapk = make_repo(tmp_path)
+    s = tmp_path / "analysis" / "sources.env"
+    s.write_text("".join(l + "\n" for l in s.read_text().splitlines() if not l.startswith("URL=")))
+    r = run(tmp_path, "--dry-run")
+    assert r.returncode == 2 and "no URL" in r.stderr
+    assert run(tmp_path, "--local-file", str(xapk), path=fake_tools(tmp_path)).returncode == 0
+    assert run(tmp_path, path=fake_tools(tmp_path)).returncode == 0

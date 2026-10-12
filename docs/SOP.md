@@ -89,6 +89,15 @@ nohup bash -c 'S=$(date +%s); jadx -j 4 -d analysis/decompiled analysis/work/<pa
 - Code is R8-obfuscated (single letter packages such as a/, o7/, p7/), but the vendor package com.example.nn20 keeps many names. Resources decoded to analysis/decompiled/resources (use that AndroidManifest.xml, which is readable).
 - Companion docs: docs/app-behaviour.md (screens, flows, permissions) and docs/binaries.md (APK, splits, native libraries). Write both from the manifest, jadx tree, and `unzip -l` of each split.
 
+## 9.1 Rebuilding analysis/ on another machine
+`scripts/rebuild-analysis.sh` automates sections 3 to 9 from `analysis/sources.env` (machine-readable twin of `analysis/SOURCES.md`; a test checks that the hashes agree).
+- Order: parse sources (parsed, never executed) -> download or `--local-file` -> verify XAPK sha256 -> extract base APK and ABI split -> verify both -> check pinned jadx and Java -> `jadx -j 4` into `analysis/decompiled` (exit 0 and 3 are both fine) -> optional `--recover` -> `analysis/BUILD-INFO.txt` (git-ignored).
+- Safety: a mismatch exits 3 and writes nothing further. `--accept-new-hash` prints the actual hash and continues but edits no file; you decide whether to update `sources.env` and `SOURCES.md`. Extracted files are re-verified on every run and re-extracted from the verified archive if they differ.
+- Idempotent: a verified archive, verified extracted APKs and a `jadx.done` marker carrying the base APK hash are skipped; `--force` redoes everything and downgrades a tool-version mismatch to a warning. `--dry-run` shows the plan.
+- Pins: jadx 1.5.6 and Java 17 are checked; `setup-tools.sh` installs jadx and apktool at pinned versions (override with `JADX_VERSION`, `APKTOOL_VERSION`). The JDK download is still "latest 17" with no hash.
+- Tests: `tests/test_rebuild_analysis.py` uses a fake XAPK, fake jadx and `--local-file`, so no network or real tools are needed. The real run was verified on the box with the real hashes (they match SOURCES.md); the network download path itself is unverified in tests.
+- New target: copy `analysis/sources.env`, change the values, run with `--accept-new-hash` once to learn the hashes, then record them.
+
 ## 10. Phase: locate BLE UUIDs
 Method used (all greps from analysis/decompiled/sources):
 1. Find GATT users: `grep -rlE "BluetoothGattCallback|writeCharacteristic|requestMtu" --include=*.java .`. Many hits are bundled SDKs (here Jieli, com.jieli.*). Separate vendor code from SDK code by package.

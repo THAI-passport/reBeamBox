@@ -1,18 +1,16 @@
-"""scripts/rebuild-analysis.sh: argument parsing, sources parsing and the hash safety paths, all offline."""
+"""scripts/rebuild_analysis.py: argument parsing, sources parsing and the hash safety paths, all offline."""
 import hashlib
 import os
-import shutil
 import stat
 import subprocess
+import sys
 import zipfile
 
 import pytest
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-SCRIPT = os.path.join(ROOT, "scripts", "rebuild-analysis.sh")
+SCRIPT = os.path.join(ROOT, "scripts", "rebuild_analysis.py")
 
-pytestmark = pytest.mark.skipif(shutil.which("bash") is None or shutil.which("unzip") is None or shutil.which("sha256sum") is None,
-                                reason="needs bash, unzip and sha256sum")
 
 
 def sha(b):
@@ -36,12 +34,14 @@ def make_repo(tmp_path, xapk_hash=None, base_hash=None, extra=""):
 
 
 def fake_tools(tmp_path, version="1.5.6", rc=0):
+    if sys.platform == "win32":
+        pytest.skip("fake jadx/java are shell scripts")
     """A fake jadx and java on PATH so the decompile step runs without the real toolchain."""
     b = tmp_path / "bin"
     b.mkdir(exist_ok=True)
     (b / "jadx").write_text('#!/bin/sh\nif [ "$1" = "--version" ]; then echo %s; exit 0; fi\n'
                             'while [ $# -gt 0 ]; do [ "$1" = "-d" ] && mkdir -p "$2/sources"; shift; done\n'
-                            'echo ran >> "%s/jadx-calls"\nexit %d\n' % (version, tmp_path, rc))
+                            'echo "ran $JAVA_OPTS" >> "%s/jadx-calls"\nexit %d\n' % (version, tmp_path, rc))
     (b / "java").write_text('#!/bin/sh\necho \'openjdk version "17.0.1" 2024-01-01\' >&2\n')
     for f in b.iterdir():
         f.chmod(f.stat().st_mode | stat.S_IEXEC)
@@ -54,15 +54,15 @@ def run(tmp_path, *args, path=None, env=None):
     e["JAVA_HOME"] = str(tmp_path / "nojdk")
     if env:
         e.update(env)
-    return subprocess.run(["bash", SCRIPT, "--root", str(tmp_path), *args], capture_output=True, text=True, env=e)
+    return subprocess.run([sys.executable, SCRIPT, "--root", str(tmp_path), *args], capture_output=True, text=True, env=e)
 
 
 def test_help_and_unknown_option(tmp_path):
-    r = subprocess.run(["bash", SCRIPT, "--help"], capture_output=True, text=True)
+    r = subprocess.run([sys.executable, SCRIPT, "--help"], capture_output=True, text=True)
     assert r.returncode == 0 and "--accept-new-hash" in r.stdout and "--dry-run" in r.stdout and "--recover" in r.stdout
-    r = subprocess.run(["bash", SCRIPT, "--bogus"], capture_output=True, text=True)
+    r = subprocess.run([sys.executable, SCRIPT, "--bogus"], capture_output=True, text=True)
     assert r.returncode == 2 and "unknown option: --bogus" in r.stderr
-    r = subprocess.run(["bash", SCRIPT, "--local-file"], capture_output=True, text=True)
+    r = subprocess.run([sys.executable, SCRIPT, "--local-file"], capture_output=True, text=True)
     assert r.returncode == 2 and "needs a value" in r.stderr
 
 
@@ -204,3 +204,23 @@ def test_missing_url_only_matters_when_a_download_is_needed(tmp_path):
     assert r.returncode == 2 and "no URL" in r.stderr
     assert run(tmp_path, "--local-file", str(xapk), path=fake_tools(tmp_path)).returncode == 0
     assert run(tmp_path, path=fake_tools(tmp_path)).returncode == 0
+
+
+def test_heap_option_validation_and_killed_hint(tmp_path):
+    xapk = make_repo(tmp_path)
+    r = run(tmp_path, "--local-file", str(xapk), "--max-heap", "2g", path=fake_tools(tmp_path))
+    assert r.returncode == 0, r.stderr
+    assert "-Xmx2g" in (tmp_path / "jadx-calls").read_text()
+    r = run(tmp_path, "--local-file", str(xapk), "--max-heap", "lots", "--force", path=fake_tools(tmp_path))
+    assert r.returncode == 2 and "heap must look like" in r.stderr
+    r = run(tmp_path, "--local-file", str(xapk), "--max-heap", "1g", "--force", path=fake_tools(tmp_path, rc=137))
+    assert r.returncode == 5 and "out of memory" in r.stderr
+
+
+def test_url_override_downloads_and_verifies(tmp_path):
+    xapk = make_repo(tmp_path)
+    moved = tmp_path / "elsewhere.bin"
+    xapk.rename(moved)
+    r = run(tmp_path, "--url", moved.as_uri(), path=fake_tools(tmp_path))
+    assert r.returncode == 0, r.stderr
+    assert (tmp_path / "analysis" / "apk" / "fake.xapk").is_file()

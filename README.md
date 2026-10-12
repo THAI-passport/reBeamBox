@@ -18,7 +18,7 @@ pip install -e .[emulation]      # optional: unicorn, capstone, pyelftools for t
 ```
 
 ### Rebuilding the analysis files (research only)
-The APK and the decompiled tree are never committed. To recreate them on another machine: `scripts/setup-tools.sh`, then `scripts/rebuild-analysis.sh`. It reads `analysis/sources.env` (URL, SHA-256 of the XAPK, base APK and ABI split, tool pins), downloads, refuses to continue on a hash mismatch, extracts, runs jadx into `analysis/decompiled` and writes `analysis/BUILD-INFO.txt`. Options: `--dry-run`, `--force`, `--recover` (CFR recovery), `--local-file PATH` (skip the download), `--accept-new-hash` (print the new hash and continue; edits nothing). See docs/SOP.md section 9.1. The client itself does not need any of this.
+The APK and the decompiled tree are never committed. To recreate them on another machine: `python scripts/setup_tools.py`, then `python scripts/rebuild_analysis.py` (the .sh files are wrappers; Linux, macOS, Windows; `--max-heap 3g` on small machines, `--url`/`--local-file` when the vendor mirror is unreachable). It reads `analysis/sources.env` (URL, SHA-256 of the XAPK, base APK and ABI split, tool pins), downloads, refuses to continue on a hash mismatch, extracts, runs jadx into `analysis/decompiled` and writes `analysis/BUILD-INFO.txt`. Options: `--dry-run`, `--force`, `--recover` (CFR recovery), `--local-file PATH` (skip the download), `--accept-new-hash` (print the new hash and continue; edits nothing). See docs/SOP.md section 9.1. The client itself does not need any of this.
 
 ## Quick start
 ```

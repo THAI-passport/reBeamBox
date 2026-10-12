@@ -90,7 +90,7 @@ nohup bash -c 'S=$(date +%s); jadx -j 4 -d analysis/decompiled analysis/work/<pa
 - Companion docs: docs/app-behaviour.md (screens, flows, permissions) and docs/binaries.md (APK, splits, native libraries). Write both from the manifest, jadx tree, and `unzip -l` of each split.
 
 ## 9.1 Rebuilding analysis/ on another machine
-`scripts/rebuild-analysis.sh` automates sections 3 to 9 from `analysis/sources.env` (machine-readable twin of `analysis/SOURCES.md`; a test checks that the hashes agree).
+`scripts/rebuild_analysis.py` (Python; `rebuild-analysis.sh` wraps it) automates sections 3 to 9 from `analysis/sources.env` (machine-readable twin of `analysis/SOURCES.md`; a test checks that the hashes agree).
 - Order: parse sources (parsed, never executed) -> download or `--local-file` -> verify XAPK sha256 -> extract base APK and ABI split -> verify both -> check pinned jadx and Java -> `jadx -j 4` into `analysis/decompiled` (exit 0 and 3 are both fine) -> optional `--recover` -> `analysis/BUILD-INFO.txt` (git-ignored).
 - Safety: a mismatch exits 3 and writes nothing further. `--accept-new-hash` prints the actual hash and continues but edits no file; you decide whether to update `sources.env` and `SOURCES.md`. Extracted files are re-verified on every run and re-extracted from the verified archive if they differ.
 - Idempotent: a verified archive, verified extracted APKs and a `jadx.done` marker carrying the base APK hash are skipped; `--force` redoes everything and downgrades a tool-version mismatch to a warning. `--dry-run` shows the plan.

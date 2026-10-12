@@ -515,3 +515,28 @@ Entry format: date, phase, problem, cause, solution (or Status: Unsolved plus wh
 - Evidence: `rebeambox/sim.py` used bare literals for free space (20000 KB, 32000 KB total, 12000 KB over Wi-Fi). A reader could take them for measured values.
 - Cause: the simulator was written before the assumption register existed.
 - Solution: named constants with an assumption comment pointing at `docs/tasks/results/S8-2026-10-12.md`; no behaviour change, suite unchanged. The reference document's disputes moved to FACTS.md section 9. Status: Solved.
+
+## 73. Documented guard time used the wrong multiplier
+- Date: 2026-10-12. Found during S2.
+- Evidence: PROTOCOL 2.6 and the client had `min(ceil(N/1000) * 800 + 800, 3000)` ms. The app's smali multiplies by 0x12c (300). The decompiled Java showed a library constant with the value 300 in that place, so the earlier reading took it for something else.
+- Cause: a jadx constant substitution plus a doc line tagged [C] without a second look at the bytecode.
+- Solution: `nn20.guard_time_ms` now uses 300 (test updated and extended), PROTOCOL, FACTS section 10, HANDOFF corrected, SOP 12.4 added. Effect: the client waits 500 ms less for small uploads. Status: Solved; the badge's own need for a guard is still [U] (HW-9).
+
+## 74. Free-space margin and ACK retry count did not match the app
+- Date: 2026-10-12. Found during S2.
+- Evidence: the app refuses an upload when payload + 0x100000 (1 MiB) exceeds free space; the client and docs said 64 KiB. In ACK mode the app counts failures and aborts on the third, so only two retries happen (waits 500 and 1000 ms); docs and client allowed three retries with a 2000 ms wait.
+- Cause: another substituted constant (the margin) and an off-by-one in reading increment-then-compare.
+- Solution: `FREE_SPACE_MARGIN` and `ACK_ABORT_FAILURES` in `rebeambox/session.py`, two new tests, docs corrected (PROTOCOL, FACTS, HANDOFF, hardware-prediction). Status: Solved. The margin is a client safety choice that happens to match the app.
+
+## 75. Watch device tag was wrong in the scan table
+- Date: 2026-10-12. Found during S6.
+- Evidence: the SDK's device-type enum has WATCH = 0xB9 (smali), the client and PROTOCOL 3.1 had 0xB5. The enum also lists phone case 0xB0, alarm clock 0xB1, speaker 0xB2, badge 0xB3.
+- Cause: a transcription slip from an earlier pass, never cross-checked.
+- Solution: `scan.DEVICE_TAGS` and PROTOCOL fixed, test pinning the table added. No effect on badge discovery (only 0xB3 is accepted). Status: Solved.
+
+## 76. FACTS routing row contradicted PROTOCOL
+- Date: 2026-10-12. Found during S6.
+- Evidence: FACTS section 3 said the BadgeSdk path is chosen by the server product record; the app's code chooses it by the advertised name (NEO or B-Device after normalising), anything else goes to nn20 (PROTOCOL 1.1, re-read in S6).
+- Cause: the FACTS row was written from the product-list analysis, not from the connect handler.
+- Solution: row corrected and tagged with S6. Status: Solved.
+

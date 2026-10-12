@@ -37,7 +37,7 @@ Client rule: use the size the badge reports. Without a report, nn20 falls back t
 | NIJI | nn20 BLE, service 0x01F0 only (write 0x01F1, notify 0x01F2); advertised name `E-badge` | [W] |
 | NANO | nn20 BLE, service 0x01F0 only | [W] |
 | NIKKO (Pulse) | nn20 BLE expected; advertised name `Nikko-badge(BLE)` reported | [I] and [W] |
-| BadgeSdk / Jieli RCSP (C2E6FD00, 0xAE00, E1/SAFER+ auth) | used by the app for devices whose product record says BT and which expose 0xAE00 | [C] for app logic, no model confirmed to use it |
+| BadgeSdk / Jieli RCSP (C2E6FD00, 0xAE00, E1/SAFER+ auth) | used by the app when the advertised name contains NEO or B-Device (name test, not the server record); also needs 0xAE00 on the device | [C] for app logic (S6 2026-10-12), no model confirmed to use it |
 | Wi-Fi (badge access point, TCP 192.168.8.1:8080) | used by the app for product records of type WiFi | [C] for app logic, which model uses it is [U] |
 
 The app has no model table; the choice comes from a server product list and runtime service discovery [C]. Full detail: docs/models.md, docs/PROTOCOL.md section 6, docs/wifi-protocol.md.
@@ -88,7 +88,7 @@ Source of the claims: `docs/beambox-reverse-reference.md`, a third-party write-u
 
 | Topic | Reference claims [W] | Repo position | Settled by |
 |---|---|---|---|
-| Upload spacing | 300 ms minimum between uploads | 300 ms is the Wi-Fi camera frame spacing; BLE flash writes keep the 30 s / 50 per day guard (section 7, `safe-write.md`) | code read of the BLE send path |
+| Upload spacing | 300 ms minimum between uploads | (S2 2026-10-12: the app's nn20 upload gate does enforce 300 ms between operations and rejects an upload while one runs [C], PROTOCOL 2.6; that is app pacing, not a known badge requirement.) 300 ms is the Wi-Fi camera frame spacing; BLE flash writes keep the 30 s / 50 per day guard (section 7, `safe-write.md`) | code read of the BLE send path |
 | Direct-draw framebuffer | firmware has none | Wi-Fi camera mode looks like a RAM display path [I] (`wifi-protocol.md`) | HW-12 |
 | Battery | 150 to 300 mAh | section 6 | teardown or label |
 | Panel | 360x360 physical | sections 1 and 2 | HW-5, owner photos |
@@ -96,3 +96,14 @@ Source of the claims: `docs/beambox-reverse-reference.md`, a third-party write-u
 | Flash size and endurance | 8 to 16 MB, 100,000 P/E | section 4; endurance is a typical datasheet figure [I], wear levelling [U] | chip marking |
 | NIKKO size | defaults to 368 [C there] | 368 only when the badge reports nothing; the reported size wins (section 2) | code read, HW-5 |
 | Still type | type 5 for all stills | matches the client default, based on a Niji report [W] | HW-5 per model |
+
+## 10. App constants checked against smali (S2 and S6, 2026-10-12)
+Values the app uses on the nn20 and scan paths, read from the app's smali because the decompiled Java can show a library constant in place of the real literal. Details and sources: `docs/tasks/results/S2-2026-10-12.md`.
+
+| Item | Value | Evidence |
+|---|---|---|
+| End-of-upload guard time | `min(ceil(N/1000) * 300 + 800, 3000)` ms, N = packets (earlier docs said multiplier 800) | [C] smali |
+| Free-space margin before an upload | 1 MiB (earlier docs said 64 KiB) | [C] smali |
+| ACK-mode failures | abort on the third failure of an upload, waits 500 then 1000 ms | [C] jadx Java (small literals), smali not read for this one |
+| Watch device tag in advertising data | 0xB9 (earlier docs said 0xB5); badge 0xB3, others 0xB0 to 0xB2 | [C] smali |
+| App scan list | hides names containing BLE, shows names containing the stored signal name or NEO or B-Device, skips unnamed devices | [C] |

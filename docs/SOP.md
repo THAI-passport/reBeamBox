@@ -176,6 +176,13 @@ Procedure that worked, reusable for any secondary transport:
 3. For a type-inference failure read the smali (apktool) and, to confirm, convert the one dex with dex2jar and decompile the class with CFR (`--jarfilter`); CFR handles a register reused as long and double. Script: `scripts/recover-failed-methods.sh`. Both outputs stay in git-ignored `analysis/work`.
 4. Only record behaviour, not code; find callers by grepping the call site to learn where each argument comes from.
 
+## 12.4 Numeric constants: confirm in smali, grep literals not names
+Learned in S2 (2026-10-12), see problem log 73 and 74.
+- jadx (and the shrinker behind the app) can print a library constant in place of a literal that has the same value, for example `RANK_SECURE` where the code multiplies by 300. The doc then carries a number that only looks sourced. Any number that goes on the wire or into a timing rule (multipliers, margins, caps, tags) must be read from smali once: `apktool d -s -f --no-res -o analysis/work/smali analysis/work/<base>.apk`, then grep the method for `const/16`, `0x` literals and `mul-int`, `add-int`.
+- Primitive `static final` constants are inlined at build time. Grepping the constant name finds no callers even when the value is used everywhere. Grep the literal and the packing site (`(byte) 13`, `{0, 105}`), or the object-typed constants (UUIDs are not inlined, so zero references to a UUID name is meaningful).
+- Check retry and abort logic by counting: increment-then-compare (`n++; if (n >= 3) abort`) allows two retries, not three.
+- When the same app ships an SDK (here a Jieli based badge SDK), read its enums and tag tables once; they list sibling products (watch, phone case, alarm clock, speaker) that matter for other targets.
+
 ## 13. Phase: tests
 `.venv/bin/python -m pytest tests -q` (software test plan: docs/software-test-v1.md; hardware plan: docs/hardware-test-v1.md; no hardware, ffmpeg tests skip if ffmpeg is missing). Coverage: frame serialization and checksums (control, nn20, rcsp), auth vectors frozen from the native library emulation, container layouts, media conversion and the 3 s cap, session flows against the simulators (still, animation, no packet CRC, retry after a failed packet, free-space refusal, memory refusal), CLI dry run output, and the no-vendor-calls check. Pitfall: a test GIF made of near-identical frames is merged by Pillow on save; make frames visibly different.
 
@@ -309,3 +316,4 @@ General rule used throughout: probe a tool with a version command or a ten-secon
 ## 16. Promote to reWork (2026-10-12)
 Generic lessons from this repo that belong in reWork's skills. Delete a line once it is folded in there.
 - None open. Folded on 2026-10-12: imported-document disputes (re-protocol-spec), simulator assumption constants (re-client-sim), payload size table (re-hardware-recon).
+- Open: numeric constants must be confirmed in smali (SOP 12.4) and the checker should flag a named library constant used in an arithmetic expression; fold into re-protocol-spec.

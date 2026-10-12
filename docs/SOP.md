@@ -308,6 +308,4 @@ General rule used throughout: probe a tool with a version command or a ten-secon
 
 ## 16. Promote to reWork (2026-10-12)
 Generic lessons from this repo that belong in reWork's skills. Delete a line once it is folded in there.
-1. Imported third-party write-ups: tag every claim `[W]` whatever tag they carry, move each disagreement into a dated dispute section of FACTS.md, and leave a one-line pointer in the imported file instead of a second table. (re-protocol-spec)
-2. Simulator literals that stand for device values (free space, sizes, timings) must be named constants with an "assumption" comment that points at the assumption register; write the register before first contact. (re-client-sim)
-3. Payload size table per transport from dry runs of generated test media, before the write budget is set. (re-hardware-recon)
+- None open. Folded on 2026-10-12: imported-document disputes (re-protocol-spec), simulator assumption constants (re-client-sim), payload size table (re-hardware-recon).

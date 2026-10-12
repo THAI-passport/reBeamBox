@@ -2,18 +2,7 @@
 
 > Imported 2026-10-12 from an external write-up. Treat as `[W]` (third-party) except where PROTOCOL.md already confirms the same statement. Where it disagrees with `docs/PROTOCOL.md` or `docs/FACTS.md`, those win. The tags inside the document below are the author's, not ours.
 >
-> Reconciliation (check each against the code when the decompiled tree is available, then fix PROTOCOL.md/FACTS.md and delete the row):
->
-> | Statement in this document | Repo position | Action |
-> |---|---|---|
-> | Minimum inter-upload delay of 300 ms `[C]` | 300 ms is the app's Wi-Fi camera frame spacing; BLE flash writes are guarded at 30 s minimum and 50 per day (`docs/safe-write.md`) | Keep the guard; do not cite 300 ms for BLE stills |
-> | Firmware has no direct-draw framebuffer command `[C]` | The Wi-Fi camera mode looks like a RAM display path `[I]` (`docs/wifi-protocol.md`) | Leave `[I]`; settle with HW-12 |
-> | Battery 150 to 300 mAh | Retail and teardown say 450 to 500 mAh `[W]` (`docs/models.md`) | FACTS.md section 6 owns it |
-> | Panel "360x360 physical" | Nano reported as 454x454 AMOLED behind a 360 buffer `[W]`; owner says Pulse is 1.8 inch | FACTS.md sections 1 and 2 own it |
-> | H9: non-persistence "proves an SRAM framebuffer bypass" | Overreach: a lost picture can also mean a reset slot or default image | Use the HW-8 interpretation table |
-> | Flash "8 to 16 MB", 100,000 P/E cycles | 16 MiB reported `[W]`; endurance is a typical datasheet figure `[I]`, wear levelling unknown | FACTS.md section 4 |
-> | "NIKKO defaults to 368" `[C]` | nn20 falls back to 368 only when the badge reports nothing; the badge-reported size wins | FACTS.md section 2 |
-> | Type 5 for all stills | Matches our default (`--nn20-still gif`), based on a Niji report `[W]` | HW-5 settles per model |
+> Reconciliation: every disagreement with the repo is a dispute row in `FACTS.md` section 9. Treat every claim below as `[W]`; FACTS.md and PROTOCOL.md win.
 
 ---
 

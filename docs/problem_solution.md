@@ -425,3 +425,87 @@ Entry format: date, phase, problem, cause, solution (or Status: Unsolved plus wh
 - Problem: Safe-write only warned about high daily counts, so a loop could still wear out flash.
 - Cause: Policy was warnings plus a minimum interval only.
 - Solution: Hard cap of 50 writes per badge per rolling 24 hours (`--max-per-day`, 0 disables, `--force` overrides), `CapReached` is a `Blocked` subclass so the CLI exits 2. The default warning threshold moved from 100 to 40 so the warning comes before the cap. Status: Solved.
+
+## 60. Agent rules lived only in prose and a mislabelled review file
+- Date: 2026-10-12
+- Phase: documentation
+- Problem: No AGENTS.md or fixes list existed, so agent rules (safe-write, no vendor artifacts, log upkeep) lived only in the SOP and README. A README test count had drifted again, and the critique of an external review sat in a file named `haiku5.5-is-garbage.md`.
+- Cause: Rules were written as procedure, not as instructions an agent loads at session start.
+- Solution: Added AGENTS.md, CLAUDE.md and fixes.md; removed the README test count; renamed the critique to `docs/review-critique-2026-10.md`; added a tag-mapping note to PROTOCOL.md. Status: Solved. Hardware testing is still open (see fixes.md).
+
+## 61. Analysis files were not rebuildable by script
+- Date: 2026-10-12
+- Phase: reproducibility
+- Problem: AGENTS.md required that analysis/ be rebuildable, but only prose steps existed, and setup-tools.sh fetched unpinned latest versions.
+- Cause: The download, hash check, extraction and jadx run were done by hand once.
+- Solution: Added `scripts/rebuild-analysis.sh` driven by `analysis/sources.env`; it refuses on a hash mismatch (`--accept-new-hash` prints the hash and edits nothing), is idempotent and has `--dry-run`, `--force`, `--recover`, `--local-file`. jadx and apktool are pinned. Status: Solved for the local path; the network download is untested in the suite.
+
+## 62. A long jadx run was killed by the tool shell timeout
+- Date: 2026-10-12
+- Phase: reproducibility
+- Problem: Running the rebuild script in the foreground got "Killed" (exit 137) after about 60 s and the script recorded a failed jadx run.
+- Cause: Memory pressure on the shared box: jadx stalled at 75 percent and the process was killed (reproduced three times, also when detached). A run with `JAVA_OPTS=-Xmx3g` finished in about 45 s.
+- Solution: Cap the heap with `JAVA_OPTS=-Xmx3g` when memory is tight and run detached (`setsid nohup ... &`). The script never treats a killed jadx as success (exit 137 is reported and the marker is not accepted). Status: Solved.
+
+## 63. Version query failed silently under set -e
+- Date: 2026-10-12
+- Phase: reproducibility
+- Problem: With a broken jadx on PATH the script exited 1 with no message.
+- Cause: A failing command inside `$(... | head -1)` with pipefail ended the script before the pin check.
+- Solution: Version lookups end with `|| true`, so the pin check reports the mismatch with exit 4. Status: Solved.
+
+## 64. Rebuild and setup scripts were bash-only
+- Date: 2026-10-12
+- Phase: tooling
+- Problem: `rebuild-analysis.sh` used `sha256sum` and `declare -A`; `setup-tools.sh` fetched linux/x64 only and edited only `~/.bashrc`. On macOS (bash 3.2, no `sha256sum`) and Windows they did not run, although AGENTS.md listed macOS as supported.
+- Cause: bash chosen for convenience; GNU userland assumed.
+- Solution: reimplemented both in Python 3 standard library (`scripts/rebuild_analysis.py`, `scripts/setup_tools.py`); the `.sh` files are wrappers. The 18 existing tests passed unchanged against the port before new ones were added (heap option, `--url`, setup URLs and the macOS JDK bundle layout). Also added `--max-heap` (default 3g under 8 GiB RAM) and `--url`. Status: Solved for Linux (tested here); macOS and Windows are covered by CI and unit tests only.
+
+## 65. Cloud session cannot reach the download hosts
+- Date: 2026-10-12
+- Phase: tooling
+- Problem: from a cloud container, `d.apkpure.com` and `api.adoptium.net` are unreachable and github release URLs return 403, so a rebuild stops at the download.
+- Cause: the environment network policy allows package managers and a short list of hosts.
+- Solution: add the hosts under Allowed domains in the environment settings, or pass `--local-file`. Status: needs the user.
+
+## 66. Recon checklists could not be executed by a newcomer
+- Date: 2026-10-12
+- Phase: documentation and tooling
+- Problem: `hardware-recon-checklist.md` mixed procedures, background and an external review; steps contradicted the tool behaviour (the H8 identical rewrite is skipped by the delta guard, the 30 s interval and 50 per day cap were not budgeted), the free space number was not printed anywhere, test media and a passive notification logger did not exist, the FCC ID spelling was wrong in one place, and nothing said who may do which step (a cloud sandbox has no Bluetooth).
+- Cause: the checklist was written before the safe-write policy and the first-contact tooling.
+- Solution: new task pack `docs/tasks/` with per-task executor, write cost, exact commands, interpretation tables, stop conditions and an assumption policy; `tools/make_test_media.py`, `tools/notify_log.py`; the nn20 session now logs every status JSON (`badge status:` line, `Nn20Session.status_log`). Status: Solved in documentation; untested by a second agent and by hardware.
+
+## 67. Hash mismatch after a vendor release gave no clue why
+- Date: 2026-10-12
+- Phase: tooling
+- Problem: `analysis/sources.env` pins the XAPK hash but downloads from a `?version=latest` link. After a new release the rebuild stops with only two hashes, and a newcomer cannot tell a corrupt download from a new version. A second known-good source could not be configured.
+- Cause: one URL, no version information in the error.
+- Solution: `scripts/rebuild_analysis.py` now prints the version the downloaded XAPK reports (manifest.json) against the pinned version, and tries `URL`, `URL2`, `URL3`, `URL4` in order until one matches the pinned hash. Tests in `tests/test_rebuild_analysis.py`. Status: Solved. Open: nobody has recorded a versioned mirror yet, so `URL2` is empty (see fixes.md).
+
+## 68. Task pack mentioned flags that might not exist
+- Date: 2026-10-12
+- Phase: documentation
+- Problem: a step-by-step pack is only as good as its commands; a renamed flag would silently break a hardware session.
+- Cause: documentation and CLI evolve separately.
+- Solution: `tests/test_task_pack_commands.py` checks every `rebeambox` subcommand and flag and every `python tools/...` / `scripts/...` path mentioned in `docs/tasks/`. It was checked by injecting a bogus flag (the test failed as expected). Also added `docs/tasks/QUICKSTART.md` because the full pack is long and weaker agents skim. Status: Solved.
+
+## 69. A rebuild on a new instance repeated work the docs already held
+- Date: 2026-10-12
+- Phase: process
+- Problem: a fresh agent's default is to rebuild and decompile, which costs a 72 MB download and a jadx run and often answers nothing new; and findings from a pass were not always written back, so the next pass repeated it.
+- Cause: no rule said when to rebuild, and no rule said what to record afterwards.
+- Solution: AGENTS.md "Rebuild only when necessary" (grep the docs, check for an existing tree, rebuild only for `[I]`/`[U]` claims, new versions or contradictions, `--dry-run` first, state the reason) and "After every decompile pass" (PROTOCOL, FACTS, SOP, problem log in the same commit); SOP 9.2. Status: Solved as process; relies on agents following it.
+
+## 71. External reference documents disagree with the repo
+- Date: 2026-10-12
+- Phase: documentation
+- Problem: an imported Beambox summary states several values with `[C]` that the repo holds as `[W]`/`[I]` or as different numbers (BLE minimum delay, battery size, panel size, what a non-persistent picture proves).
+- Cause: external authors blend confirmed and reported facts under one tag scheme.
+- Solution: the document is stored as `docs/beambox-reverse-reference.md` with a reconciliation table at the top; PROTOCOL.md and FACTS.md win; each row is closed when the decompiled code or a hardware result settles it. Also added `docs/tasks/NEXT-PASS-PROMPT.md` for the next agent pass. Status: Open until the rows are closed (see fixes.md).
+
+## 70. Hash pinned, but only by a floating latest link
+- Date: 2026-10-12
+- Phase: reproducibility
+- Problem: the only URL for the app is a floating "latest" link, so a vendor update changes the file while the pinned hash stays; a rebuild then fails, and `--accept-new-hash` could be used to move on without a record.
+- Cause: the pin was a hash plus a floating URL; no rule asked for a versioned URL, an owner-controlled copy or a new entry per release.
+- Solution: AGENTS.md pinning rule, `COPY_LOCATION` in sources.env, warnings from the rebuild script when all URLs float or the copy location is missing, clearer mismatch and accept messages, SOP 9.3, tests. The APKPure link is still floating; no versioned or mirrored URL is known yet, so the owner-controlled copy is the real pin. Status: Mitigated.

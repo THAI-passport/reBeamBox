@@ -6,6 +6,8 @@ Method: static reading of the decompiled app (jadx) plus smali for methods jadx 
 - [I] Inferred (reasoned from code but not directly shown)
 - [S] Speculative
 
+Tag mapping to the repo-wide scheme (AGENTS.md, docs/FACTS.md): [C] = [C], [I] = [I], [S] = [U]. [W] third-party, [V] emulator-verified and [H] hardware-confirmed are also used where they apply.
+
 Worked-example bytes come from `scripts/spec_vectors.py`, which only implements the formulas below. No app source or assets are copied.
 
 ## 0. The app contains THREE transports, selected by device name
@@ -85,6 +87,7 @@ Two modes, chosen per upload:
 - Writes are WRITE_NO_RESPONSE in both modes, so the ACKs are application-level, not ATT.
 - [C] After the last packet of a type 5 or 6 transfer the app waits an extra guard time `min(((N + 999)/1000) * 800 + 800, 3000)` ms before reporting success, to let the badge finish.
 - [C] Minimum gap between separate uploads: 300 ms. A second upload while busy is rejected.
+- [V] Client behaviour (own code, not badge evidence): every status record that parses is logged as `badge status: size=... freespace=... KB allspace=... KB time_mode=...` and kept in `Nn20Session.status_log`; the free-space and rewrite test (docs/tasks/HW-RECON.md HW-7) reads these numbers, or re-reads them with `probe --qualify` after a reconnect. Whether the real badge pushes a fresh record after each upload is [U] until HW-7 runs.
 - [C] Free-space check before upload: the app refuses if `payload + 64 KiB > freespace KB * 1024` when `freespace` is known; if unknown it proceeds.
 - [I] Whether ACKs are mandatory for the badge to accept data: no code path sends data without the badge having an ACK option, but the "no-ACK" mode proves the badge tolerates a stream without per-batch ACK; the 20 ms spacing there is the safe minimum.
 

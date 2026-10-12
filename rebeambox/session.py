@@ -287,6 +287,7 @@ class Nn20Session:
         self.link, self.log, self.guard_scale, self.interval = link, log, guard_scale, interval
         self.ack_batch = ack_batch
         self.status = {}
+        self.status_log = []        # every status JSON the badge pushed, in order (free space before and after a write)
         self.modes = []             # trace of the modes used, for logs and tests
         self._buf = b""
         self._acks = asyncio.Queue()
@@ -303,7 +304,10 @@ class Nn20Session:
                 try:
                     self.status = json.loads(text)
                 except ValueError:
-                    pass
+                    continue
+                self.status_log.append(dict(self.status))
+                self.log("badge status: size=%s freespace=%s KB allspace=%s KB time_mode=%s" % (
+                    self.status.get("size"), self.status.get("freespace"), self.status.get("allspace"), self.status.get("time_mode")))
 
     async def start(self):
         await self.link.subscribe(nn20.NOTIFY, self._on_notify)

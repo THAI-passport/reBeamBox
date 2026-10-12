@@ -17,6 +17,9 @@ pip install -e .[emulation]      # optional: unicorn, capstone, pyelftools for t
 # ffmpeg: apt install ffmpeg | brew install ffmpeg | winget install ffmpeg
 ```
 
+### Rebuilding the analysis files (research only)
+The APK and the decompiled tree are never committed. To recreate them on another machine: `python scripts/setup_tools.py`, then `python scripts/rebuild_analysis.py` (the .sh files are wrappers; Linux, macOS, Windows; `--max-heap 3g` on small machines, `--url`/`--local-file` when the vendor mirror is unreachable). It reads `analysis/sources.env` (URL, SHA-256 of the XAPK, base APK and ABI split, tool pins), downloads, refuses to continue on a hash mismatch, extracts, runs jadx into `analysis/decompiled` and writes `analysis/BUILD-INFO.txt`. Options: `--dry-run`, `--force`, `--recover` (CFR recovery), `--local-file PATH` (skip the download), `--accept-new-hash` (print the new hash and continue; edits nothing). See docs/SOP.md section 9.1. The client itself does not need any of this.
+
 ## Quick start
 ```
 rebeambox scan                                   # list badges (NEO, B-Device, tag 0xB3, plus --name)
@@ -89,20 +92,26 @@ python tools/check_repo_rules.py                  # fails on emoji, analytics ho
 
 ## Tests
 ```
-python -m pytest -q                  # no hardware (250 pass, 1 skip); see docs/software-test-v1.md (larger auth fuzz: -m slow)
+python -m pytest -q                  # no hardware, CI runs the same; see docs/software-test-v1.md (larger auth fuzz: -m slow)
 ```
 
 ## Docs
 - docs/PROTOCOL.md: byte-exact protocol, with Confirmed/Inferred tags
 - docs/wifi-protocol.md: Wi-Fi access point path, control words, live camera frames, upload
 - docs/software-test-v1.md: the software test plan (what each test checks and where it lives)
+- docs/beambox-reverse-reference.md: imported external summary with a reconciliation table (PROTOCOL.md and FACTS.md win)
+- docs/tasks/NEXT-PASS-PROMPT.md: prompt for the next agent pass over reBeamBox, reWork and reWatch
+- docs/tasks/README.md: step-by-step recon task pack for agents and people (software S0 to S11, hardware HW-0 to HW-17, assumptions, status board)
 - docs/hardware-test-v1.md: tests to run with a real badge, with pass/fail criteria and a results template
 - docs/first-session-checklist.md: what to capture and report on the first real badge test
 - docs/models.md: NIKKO, NANO, NIJI comparison, transport per model, web recon
 - docs/FACTS.md: one fact sheet for screen sizes, picture size, transports, chip and limits
 - docs/pulse.md: Pulse-specific findings and how the client handles them
 - docs/ads-removal.md: how the original app shows promotions, and that this client has none
-- docs/SOP.md: reverse engineering procedure
+- AGENTS.md: rules for AI agents working in this repo (also read fixes.md and docs/problem_solution.md first)
+- fixes.md: open and fixed issues
+- docs/review-critique-2026-10.md: critique of an external review
+- docs/SOP.md: reverse engineering procedure (a generalized, target-agnostic version lives in the reWork repo)
 - docs/app-behaviour.md, docs/binaries.md: app and binary notes
 - docs/problem_solution.md: running log of problems and solutions
 - docs/hardware-prediction.md, docs/streaming-plan.md: streaming design

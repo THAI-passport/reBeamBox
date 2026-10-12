@@ -99,6 +99,8 @@ python -m pytest -q                  # no hardware, CI runs the same; see docs/s
 - docs/PROTOCOL.md: byte-exact protocol, with Confirmed/Inferred tags
 - docs/wifi-protocol.md: Wi-Fi access point path, control words, live camera frames, upload
 - docs/software-test-v1.md: the software test plan (what each test checks and where it lives)
+- docs/beambox-reverse-reference.md: imported external summary with a reconciliation table (PROTOCOL.md and FACTS.md win)
+- docs/tasks/NEXT-PASS-PROMPT.md: prompt for the next agent pass over reBeamBox, reWork and reWatch
 - docs/tasks/README.md: step-by-step recon task pack for agents and people (software S0 to S11, hardware HW-0 to HW-17, assumptions, status board)
 - docs/hardware-test-v1.md: tests to run with a real badge, with pass/fail criteria and a results template
 - docs/first-session-checklist.md: what to capture and report on the first real badge test

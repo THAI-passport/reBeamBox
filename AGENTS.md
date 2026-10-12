@@ -30,9 +30,11 @@ Instructions for AI agents working in this repository (reBeamBox: an open Python
 - Say which platforms you actually ran a change on and which are untested.
 
 ## Reverse-engineering rules
-- Static analysis only. Never install or run the target app.
-- Never commit the APK, XAPK, split APKs, decompiled output, native libraries, vendor assets, tokens, or signed URLs. Commit notes in our own words, hashes, source URLs, scripts, original code, and tests.
-- The client makes no vendor calls: no analytics hosts, no non-local URLs in code. `python tools/check_repo_rules.py` and `tests/test_no_vendor_calls.py` enforce it.
+- Static analysis comes first: read the app, decompile it, disassemble and emulate native code. Do not install or run the vendor app on your own machine unless the user approves a live test.
+- Live testing is allowed when the user approves it for that session: a real badge, a phone running the vendor app for an HCI snoop or Wireshark capture, or a live site or service the user owns or may test. Say what you will touch and for how long, start read-only, stop at the first throttle, auth challenge or unexpected reply, and record the result in `docs/problem_solution.md`. Never enter credentials or bypass protections.
+- Never commit the APK, XAPK, split APKs, decompiled output, native libraries, vendor assets, raw captures that contain personal data, tokens, or signed URLs. Commit notes in our own words, hashes, source URLs, scripts, original code, tests, and sanitized or synthetic fixtures.
+- Work that happens away from the machine holding the analysis files must be reproducible: `analysis/SOURCES.md` records where the app came from and its hashes, and `scripts/` rebuilds `analysis/` (download, verify hash, extract, decompile). If the files cannot be rebuilt, say so and ask the user for them; do not guess.
+- The client makes no vendor calls: no analytics hosts, no non-local URLs in code. `python tools/check_repo_rules.py` and `tests/test_no_vendor_calls.py` enforce it. This applies to the finished client, not to research.
 - Procedure for new targets or new research passes: `docs/SOP.md`.
 
 ## UI and docs style

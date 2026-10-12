@@ -167,10 +167,16 @@ class SimBadgeSdk(SimBadge):
             self._request_more()
 
 
+# assumption, see docs/tasks/results/S8-2026-10-12.md: invented numbers, not badge facts
+SIM_NN20_FREESPACE_KB = 20000
+SIM_NN20_ALLSPACE_KB = 32000
+SIM_WIFI_FREE_KB = 12000
+
+
 class SimNn20(SimBadge):
     """nn20 badge: pushes a status record, acknowledges every packet."""
 
-    def __init__(self, time_mode=0, freespace=20000, fail_packets=(), noack_fail_at=None, size="368,368"):
+    def __init__(self, time_mode=0, freespace=SIM_NN20_FREESPACE_KB, fail_packets=(), noack_fail_at=None, size="368,368"):
         self.time_mode, self.freespace, self.size = time_mode, freespace, size
         self.noack_fail_at = noack_fail_at      # in no-ACK mode report a drop at this write number, then ACK
         self.fail = set(fail_packets)
@@ -181,7 +187,7 @@ class SimNn20(SimBadge):
         return uuid.lower() == nn20.SERVICE
 
     def on_subscribe(self, uuid):
-        st = json.dumps({"freespace": self.freespace, "allspace": 32000, "time_mode": self.time_mode,
+        st = json.dumps({"freespace": self.freespace, "allspace": SIM_NN20_ALLSPACE_KB, "time_mode": self.time_mode,
                          "devname": "SIM-NN20", "brand": "sim", "type": 13, "size": self.size}, separators=(",", ":"))
         self.link.push(nn20.NOTIFY, nn20.make_reply(1, st))
 
@@ -211,7 +217,7 @@ class SimWifiBadge:
     """Software badge for the Wi-Fi path. Handles both connection kinds on one port: control words /
     camera frames, and HTTP POST /upload."""
 
-    def __init__(self, free_kb=12000, refuse=False):
+    def __init__(self, free_kb=SIM_WIFI_FREE_KB, refuse=False):
         self.free_kb, self.refuse = free_kb, refuse
         self.files = {}          # name -> bytes
         self.frames = []         # camera frames received

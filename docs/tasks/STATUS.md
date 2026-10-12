@@ -6,18 +6,18 @@ Update the row when the state changes; link the result file.
 ## Software (AI alone)
 | Task | Title | State | Owner | Result |
 |---|---|---|---|---|
-| S0 | Baseline: environment, tests, rules | todo | | |
-| S1 | Rebuild or obtain the analysis tree | todo | | |
-| S2 | Audit the unconfirmed claims in PROTOCOL.md | todo | | |
+| S0 | Baseline: environment, tests, rules | done | AI | suite green, 2 skips (2026-10-12) |
+| S1 | Rebuild or obtain the analysis tree | blocked: needs human | AI | APK host blocked; owner to supply the XAPK for --local-file |
+| S2 | Audit the unconfirmed claims in PROTOCOL.md | blocked: needs human | AI | needs S1 |
 | S3 | Static inventory of the vendor server API | todo | | |
 | S4 | Static inventory of the firmware update path | todo | | |
-| S5 | Inventory of everything the badge can send to the app | todo | | |
-| S6 | Scan filter and model detection audit | todo | | |
-| S7 | Test media and payload size table | todo | | |
-| S8 | Simulator assumption register | todo | | |
-| S9 | First-contact readiness check | todo | | |
-| S10 | Documentation consistency pass | todo | | |
-| S11 | Wrap-up | todo | | |
+| S5 | Inventory of everything the badge can send to the app | blocked: needs human | AI | needs S1 |
+| S6 | Scan filter and model detection audit | blocked: needs human | AI | needs S1 |
+| S7 | Test media and payload size table | done | AI | results/S7-2026-10-12.md |
+| S8 | Simulator assumption register | done | AI | results/S8-2026-10-12.md |
+| S9 | First-contact readiness check | done | AI | probe --qualify sims nn20 and badge, replay_pcap and dry runs exit 0 (2026-10-12) |
+| S10 | Documentation consistency pass | done | AI | rules ok, drift checked (2026-10-12) |
+| S11 | Wrap-up | done | AI | 2026-10-12 |
 
 ## Hardware (needs a badge; see HW-RECON.md)
 | Task | Title | State | Owner | Result |

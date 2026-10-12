@@ -82,3 +82,17 @@ Measured on the development machines; dated because they can change.
 | nn20 payload for a solid 800x800 red image | about 9 KB | same | 2026-10-12 |
 | jadx memory | killed at about 75 percent on a shared box without a heap cap; finishes in about 45 s with `-Xmx3g` | problem_solution.md entry 62 | 2026-10-12 |
 | Vendor download URL | `?version=latest` moves; use URL2 for a pinned mirror | rebuild script behaviour | 2026-10-12 |
+
+## 9. Disputes raised by the imported reference (2026-10-12)
+Source of the claims: `docs/beambox-reverse-reference.md`, a third-party write-up, so every claim from it is `[W]` here regardless of the tag it carries there. The repo position stands until the decompiled code or hardware settles the row.
+
+| Topic | Reference claims [W] | Repo position | Settled by |
+|---|---|---|---|
+| Upload spacing | 300 ms minimum between uploads | 300 ms is the Wi-Fi camera frame spacing; BLE flash writes keep the 30 s / 50 per day guard (section 7, `safe-write.md`) | code read of the BLE send path |
+| Direct-draw framebuffer | firmware has none | Wi-Fi camera mode looks like a RAM display path [I] (`wifi-protocol.md`) | HW-12 |
+| Battery | 150 to 300 mAh | section 6 | teardown or label |
+| Panel | 360x360 physical | sections 1 and 2 | HW-5, owner photos |
+| Picture lost after reboot | proves an SRAM framebuffer bypass | overreach: also fits a reset slot or default image; use the HW-8 interpretation table | HW-8 |
+| Flash size and endurance | 8 to 16 MB, 100,000 P/E | section 4; endurance is a typical datasheet figure [I], wear levelling [U] | chip marking |
+| NIKKO size | defaults to 368 [C there] | 368 only when the badge reports nothing; the reported size wins (section 2) | code read, HW-5 |
+| Still type | type 5 for all stills | matches the client default, based on a Niji report [W] | HW-5 per model |

@@ -509,3 +509,9 @@ Entry format: date, phase, problem, cause, solution (or Status: Unsolved plus wh
 - Problem: the only URL for the app is a floating "latest" link, so a vendor update changes the file while the pinned hash stays; a rebuild then fails, and `--accept-new-hash` could be used to move on without a record.
 - Cause: the pin was a hash plus a floating URL; no rule asked for a versioned URL, an owner-controlled copy or a new entry per release.
 - Solution: AGENTS.md pinning rule, `COPY_LOCATION` in sources.env, warnings from the rebuild script when all URLs float or the copy location is missing, clearer mismatch and accept messages, SOP 9.3, tests. The APKPure link is still floating; no versioned or mirrored URL is known yet, so the owner-controlled copy is the real pin. Status: Mitigated.
+
+## 72. Simulator numbers looked like badge facts
+- Date: 2026-10-12. Found during S8.
+- Evidence: `rebeambox/sim.py` used bare literals for free space (20000 KB, 32000 KB total, 12000 KB over Wi-Fi). A reader could take them for measured values.
+- Cause: the simulator was written before the assumption register existed.
+- Solution: named constants with an assumption comment pointing at `docs/tasks/results/S8-2026-10-12.md`; no behaviour change, suite unchanged. The reference document's disputes moved to FACTS.md section 9. Status: Solved.

@@ -432,3 +432,24 @@ Entry format: date, phase, problem, cause, solution (or Status: Unsolved plus wh
 - Problem: No AGENTS.md or fixes list existed, so agent rules (safe-write, no vendor artifacts, log upkeep) lived only in the SOP and README. A README test count had drifted again, and the critique of an external review sat in a file named `haiku5.5-is-garbage.md`.
 - Cause: Rules were written as procedure, not as instructions an agent loads at session start.
 - Solution: Added AGENTS.md, CLAUDE.md and fixes.md; removed the README test count; renamed the critique to `docs/review-critique-2026-10.md`; added a tag-mapping note to PROTOCOL.md. Status: Solved. Hardware testing is still open (see fixes.md).
+
+## 61. Analysis files were not rebuildable by script
+- Date: 2026-10-12
+- Phase: reproducibility
+- Problem: AGENTS.md required that analysis/ be rebuildable, but only prose steps existed, and setup-tools.sh fetched unpinned latest versions.
+- Cause: The download, hash check, extraction and jadx run were done by hand once.
+- Solution: Added `scripts/rebuild-analysis.sh` driven by `analysis/sources.env`; it refuses on a hash mismatch (`--accept-new-hash` prints the hash and edits nothing), is idempotent and has `--dry-run`, `--force`, `--recover`, `--local-file`. jadx and apktool are pinned. Status: Solved for the local path; the network download is untested in the suite.
+
+## 62. A long jadx run was killed by the tool shell timeout
+- Date: 2026-10-12
+- Phase: reproducibility
+- Problem: Running the rebuild script in the foreground got "Killed" (exit 137) after about 60 s and the script recorded a failed jadx run.
+- Cause: The agent shell limits foreground commands; it was not an out-of-memory kill (9 GB free).
+- Solution: Run it with nohup in the background and read the log. The script never treats a killed jadx as success (exit 137 is reported and the marker is not accepted). Status: Solved.
+
+## 63. Version query failed silently under set -e
+- Date: 2026-10-12
+- Phase: reproducibility
+- Problem: With a broken jadx on PATH the script exited 1 with no message.
+- Cause: A failing command inside `$(... | head -1)` with pipefail ended the script before the pin check.
+- Solution: Version lookups end with `|| true`, so the pin check reports the mismatch with exit 4. Status: Solved.

@@ -17,6 +17,9 @@ pip install -e .[emulation]      # optional: unicorn, capstone, pyelftools for t
 # ffmpeg: apt install ffmpeg | brew install ffmpeg | winget install ffmpeg
 ```
 
+### Rebuilding the analysis files (research only)
+The APK and the decompiled tree are never committed. To recreate them on another machine: `scripts/setup-tools.sh`, then `scripts/rebuild-analysis.sh`. It reads `analysis/sources.env` (URL, SHA-256 of the XAPK, base APK and ABI split, tool pins), downloads, refuses to continue on a hash mismatch, extracts, runs jadx into `analysis/decompiled` and writes `analysis/BUILD-INFO.txt`. Options: `--dry-run`, `--force`, `--recover` (CFR recovery), `--local-file PATH` (skip the download), `--accept-new-hash` (print the new hash and continue; edits nothing). See docs/SOP.md section 9.1. The client itself does not need any of this.
+
 ## Quick start
 ```
 rebeambox scan                                   # list badges (NEO, B-Device, tag 0xB3, plus --name)

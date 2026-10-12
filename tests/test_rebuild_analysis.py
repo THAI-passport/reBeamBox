@@ -247,3 +247,31 @@ def test_mismatch_explains_the_version_in_the_downloaded_xapk(tmp_path):
     r = run(tmp_path, "--local-file", str(newer))
     assert r.returncode == 3
     assert "9.9.9" in r.stderr and "pins version 1.0" in r.stderr
+
+
+def test_pin_warnings_for_floating_url_and_missing_copy(tmp_path):
+    xapk = make_repo(tmp_path, extra="URL2=\n")
+    s = tmp_path / "analysis" / "sources.env"
+    s.write_text(s.read_text().replace("URL=http://127.0.0.1:9/never", "URL=https://example.invalid/app?version=latest"))
+    r = run(tmp_path, "--dry-run", "--local-file", str(xapk))
+    assert r.returncode == 0 and "floating 'latest' link" in r.stderr and "COPY_LOCATION is not set" in r.stderr
+
+
+def test_no_pin_warning_with_versioned_url_and_copy_location(tmp_path):
+    xapk = make_repo(tmp_path, extra="COPY_LOCATION=owner box /srv/a.xapk\n")
+    r = run(tmp_path, "--dry-run", "--local-file", str(xapk))
+    assert r.returncode == 0 and "warning:" not in r.stderr
+
+
+def test_mismatch_and_accept_messages_state_the_pin_rule(tmp_path):
+    xapk = make_repo(tmp_path, xapk_hash="0" * 64)
+    r = run(tmp_path, "--local-file", str(xapk), path=fake_tools(tmp_path))
+    assert r.returncode == 3 and "NEW pinned entry" in r.stderr
+    r = run(tmp_path, "--local-file", str(xapk), "--accept-new-hash", path=fake_tools(tmp_path))
+    assert "not a pin" in r.stderr
+
+
+def test_repo_pin_rule_and_copy_location_present():
+    env = open(os.path.join(ROOT, "analysis", "sources.env")).read()
+    assert "COPY_LOCATION=" in env
+    assert "never by a floating" in open(os.path.join(ROOT, "AGENTS.md")).read()

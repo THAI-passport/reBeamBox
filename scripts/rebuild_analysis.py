@@ -107,6 +107,18 @@ def parse_sources(path, root):
     return s, rel, "xapk"
 
 
+def pin_warnings(S):
+    """Pinning rule: exact version, SHA-256, a versioned or mirrored URL and an owner-controlled copy."""
+    w = []
+    urls = [S[k] for k in ("URL", "URL2", "URL3", "URL4") if S.get(k)]
+    if urls and all(re.search(r"latest", u, re.I) for u in urls):
+        w.append("every URL looks like a floating 'latest' link; only the SHA-256 protects this pin. Add a versioned or mirrored URL as URL2 "
+                 "and keep an owner-controlled copy (COPY_LOCATION).")
+    if not S.get("COPY_LOCATION"):
+        w.append("COPY_LOCATION is not set: note where the owner-controlled exact copy of the archive lives (path or location, no secrets).")
+    return w
+
+
 def parse_args(argv):
     o = dict(sources=None, local=None, url=None, accept=False, recover=False, force=False, dry=False,
              heap="", root=os.path.dirname(SELF_DIR), help=False)
@@ -148,9 +160,11 @@ class Run:
         if note:
             sys.stderr.write("  note: %s. A moved 'latest' URL is the usual cause: find the exact file, then pass --local-file or add it as URL2.\n" % note)
         if self.o["accept"]:
-            sys.stderr.write("  --accept-new-hash given: continuing. Record this hash yourself in SOURCES if it is the new reference; no file was edited.\n")
+            sys.stderr.write("  --accept-new-hash given: continuing for inspection only; this is not a pin and no file was edited. "
+                             "A new vendor release needs a NEW pinned entry (new version, new hash); never edit the old hash. Tell the user.\n")
             return
-        sys.stderr.write("  refusing to continue. If the source legitimately changed, inspect it, then re-run with --accept-new-hash.\n")
+        sys.stderr.write("  refusing to continue. Restore the pinned file (--local-file or URL2). If the vendor shipped a new release, add a NEW pinned "
+                         "entry with the new version and hash; do not edit this hash. --accept-new-hash is for inspection only.\n")
         raise Fail(3, None)
 
     def download(self, url, dest):
@@ -197,6 +211,8 @@ def rebuild(argv):
     if not os.path.isfile(src):
         raise Fail(2, "sources file not found: %s" % src)
     S, srel, kind = parse_sources(src, root)
+    for msg in pin_warnings(S):
+        sys.stderr.write("warning: %s\n" % msg)
     r = Run(o)
     r.pinned = S["VERSION"]
     dry, force = o["dry"], o["force"]

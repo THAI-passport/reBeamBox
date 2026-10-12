@@ -495,3 +495,10 @@ Entry format: date, phase, problem, cause, solution (or Status: Unsolved plus wh
 - Problem: a fresh agent's default is to rebuild and decompile, which costs a 72 MB download and a jadx run and often answers nothing new; and findings from a pass were not always written back, so the next pass repeated it.
 - Cause: no rule said when to rebuild, and no rule said what to record afterwards.
 - Solution: AGENTS.md "Rebuild only when necessary" (grep the docs, check for an existing tree, rebuild only for `[I]`/`[U]` claims, new versions or contradictions, `--dry-run` first, state the reason) and "After every decompile pass" (PROTOCOL, FACTS, SOP, problem log in the same commit); SOP 9.2. Status: Solved as process; relies on agents following it.
+
+## 70. External reference documents disagree with the repo
+- Date: 2026-10-12
+- Phase: documentation
+- Problem: an imported Beambox summary states several values with `[C]` that the repo holds as `[W]`/`[I]` or as different numbers (BLE minimum delay, battery size, panel size, what a non-persistent picture proves).
+- Cause: external authors blend confirmed and reported facts under one tag scheme.
+- Solution: the document is stored as `docs/beambox-reverse-reference.md` with a reconciliation table at the top; PROTOCOL.md and FACTS.md win; each row is closed when the decompiled code or a hardware result settles it. Also added `docs/tasks/NEXT-PASS-PROMPT.md` for the next agent pass. Status: Open until the rows are closed (see fixes.md).

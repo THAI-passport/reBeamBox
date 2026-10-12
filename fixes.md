@@ -3,6 +3,7 @@
 Things that need fixing and things already fixed. Add to Open when you find something; move it to Fixed with what was wrong and what changed. Same commit as the change.
 
 ## Open
+- Close the reconciliation table in `docs/beambox-reverse-reference.md` row by row (code or hardware evidence), then fold anything still true into PROTOCOL.md/FACTS.md.
 - No versioned mirror of the pinned XAPK is recorded as `URL2` in `analysis/sources.env`; the `latest` link will stop matching after the next vendor release. Add one when the owner has a stable copy.
 - Recon task pack (`docs/tasks/`) is untried by a second agent; the first agent to use it should record where it tripped here.
 - Hardware: nothing is confirmed on a real badge. Run `rebeambox probe --qualify --model nikko`, then follow `docs/first-session-checklist.md`. Every `[I]`/`[S]` claim in `docs/PROTOCOL.md` waits on this.

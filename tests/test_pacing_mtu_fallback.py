@@ -197,3 +197,34 @@ def test_circular_mask_is_black_in_corners_on_white_image():
     jl = struct.unpack_from("<i", payload, 32 + 16 + 20)[0]
     img = Image.open(io.BytesIO(payload[32 + 16 + 32:32 + 16 + 32 + jl])).convert("RGB")
     assert sum(img.getpixel((2, 2))) < 40 and sum(img.getpixel((180, 180))) > 700
+
+
+# values corrected from the app's smali (docs/tasks/results/S2-2026-10-12.md) -------------------------------------------------
+
+def test_free_space_margin_is_one_mib_like_the_app():
+    from rebeambox import session
+    assert session.FREE_SPACE_MARGIN == 1024 * 1024
+    payload = bytes(100 * 1024)
+    for free_kb, ok in ((100 + 1024, True), (100 + 1023, False), (100 + 64, False)):      # 64 KiB margin would have accepted the last two
+        b = sim.SimNn20(freespace=free_kb)
+        lk, s = _session(b, 247)
+
+        async def go():
+            await s.start()
+            await s.send(5, payload)
+        if ok:
+            run(go())
+        else:
+            with pytest.raises(ProtocolError, match="free space"):
+                run(go())
+
+
+def test_ack_mode_gives_up_on_the_third_failure_like_the_app():
+    b = sim.SimNn20(time_mode=0, fail_packets={0, 1, 2, 3, 4, 5, 6, 7, 8, 9})
+    lk, s = _session(b, 247, ack_batch=1)
+
+    async def go():
+        await s.start()
+        await s.send(5, bytes(400))
+    with pytest.raises(ProtocolError):
+        run(go())

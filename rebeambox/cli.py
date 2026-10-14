@@ -25,7 +25,8 @@ def _add_common(p):
     p.add_argument("--ack-batch-size", type=int, default=4, help="nn20 ACK mode: packets per batch (default 4, falls back to 1 after errors)")
     g = p.add_argument_group("safe-write policy (flash protection, docs/safe-write.md; not applied to --dry-run)")
     g.add_argument("--min-interval-s", type=float, default=safewrite.DEFAULT_MIN_INTERVAL_S, help="minimum seconds between writes to one badge (default 30)")
-    g.add_argument("--warn-per-day", type=int, default=safewrite.DEFAULT_WARN_PER_DAY, help="warn above this many writes in 24 h (default 100, 0 = off)")
+    g.add_argument("--warn-per-day", type=int, default=safewrite.DEFAULT_WARN_PER_DAY, help="warn above this many writes in 24 h (default 40, 0 = off)")
+    g.add_argument("--max-per-day", type=int, default=safewrite.DEFAULT_MAX_PER_DAY, help="hard cap on writes per badge in 24 h (default 50, 0 = no cap)")
     g.add_argument("--warn-total", type=int, default=safewrite.DEFAULT_WARN_TOTAL, help="warn above this many writes per badge (default 10000, 0 = off)")
     g.add_argument("--force", action="store_true", help="ignore the minimum interval and the unchanged-image skip")
     g.add_argument("--no-delta", action="store_true", help="do not skip an upload identical to the last one")
@@ -38,7 +39,7 @@ def _add_common(p):
 def make_gate(args, badge_id, log):
     if args.dry_run or args.no_safe_write:
         return None
-    pol = safewrite.Policy(True, args.force, not args.no_delta, args.min_interval_s, args.warn_per_day, args.warn_total)
+    pol = safewrite.Policy(True, args.force, not args.no_delta, args.min_interval_s, args.warn_per_day, args.warn_total, args.max_per_day)
     return safewrite.Gate(args.badge_id or badge_id, pol, safewrite.Store(args.state_dir), log=log)
 
 
@@ -96,8 +97,8 @@ def apply_model(args):
     prof = models.get(getattr(args, "model", None))
     if prof:
         args.name = list(args.name) + list(prof.names)
-        if args.size is None:
-            args.size = prof.size
+        # The profile size is only the fallback inside the client (368 when the badge reports nothing); it must not
+        # override the size the badge reports, so args.size stays None unless --size is given.
     if hasattr(args, "max_seconds") and args.max_seconds is None:
         args.max_seconds = prof.video_max_s if prof else media.MAX_SECONDS
     args.still_mode = args.nn20_still or (prof.still_mode if prof else "gif")
@@ -159,8 +160,6 @@ async def _run_stream(args, log):
     src = streaming.open_source(args.path, args.source_fps, args.max_seconds)
     events, sink = [], None
     if transport == "wifi":
-        if args.model and args.size == models.get(args.model).size:
-            args.size = None
         if dry:
             badge = sim.SimWifiBadge()
             mk = lambda name: wifi.SimChannel(badge, name, events)
@@ -214,8 +213,6 @@ async def _run_stream(args, log):
 
 async def _run_wifi(args, log):
     prof = models.get(getattr(args, "model", None))
-    if prof and args.size == prof.size:
-        args.size = None          # the profile size is a BLE value; Wi-Fi uses 360 unless --size is given
     pace = not args.dry_run
     events = []
     if args.dry_run:

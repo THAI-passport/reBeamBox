@@ -102,4 +102,5 @@ def make_reply(type_, text):
 
 
 def guard_time_ms(n_packets):
-    return min(((n_packets + 999) // 1000) * 800 + 800, 3000)
+    # [C] smali of the app: ceil(N / 1000) * 300 + 800, capped at 3000 (an earlier reading of the decompiled Java gave 800 as the multiplier)
+    return min(((max(0, n_packets) + 999) // 1000) * 300 + 800, 3000)

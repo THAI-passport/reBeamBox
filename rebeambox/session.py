@@ -5,6 +5,8 @@ import time
 
 from . import control, jl_auth, nn20, rcsp
 
+FREE_SPACE_MARGIN = 1024 * 1024    # [C] the app refuses when payload + 1 MiB (0x100000 in smali) exceeds the reported free KB * 1024
+ACK_ABORT_FAILURES = 3             # [C] the app gives up on the third failure of one upload (two retries, waits 500 and 1000 ms)
 AE00 = "0000ae00-0000-1000-8000-00805f9b34fb"
 AE01 = "0000ae01-0000-1000-8000-00805f9b34fb"
 AE02 = "0000ae02-0000-1000-8000-00805f9b34fb"
@@ -287,6 +289,7 @@ class Nn20Session:
         self.link, self.log, self.guard_scale, self.interval = link, log, guard_scale, interval
         self.ack_batch = ack_batch
         self.status = {}
+        self.status_log = []        # every status JSON the badge pushed, in order (free space before and after a write)
         self.modes = []             # trace of the modes used, for logs and tests
         self._buf = b""
         self._acks = asyncio.Queue()
@@ -303,7 +306,10 @@ class Nn20Session:
                 try:
                     self.status = json.loads(text)
                 except ValueError:
-                    pass
+                    continue
+                self.status_log.append(dict(self.status))
+                self.log("badge status: size=%s freespace=%s KB allspace=%s KB time_mode=%s" % (
+                    self.status.get("size"), self.status.get("freespace"), self.status.get("allspace"), self.status.get("time_mode")))
 
     async def start(self):
         await self.link.subscribe(nn20.NOTIFY, self._on_notify)
@@ -315,7 +321,7 @@ class Nn20Session:
 
     async def send(self, type_, payload, animation_type=None, progress=None):
         free = self.status.get("freespace")
-        if free is not None and len(payload) + 64 * 1024 > int(free) * 1024:
+        if free is not None and len(payload) + FREE_SPACE_MARGIN > int(free) * 1024:
             raise ProtocolError("not enough free space on badge (%s KB)" % free)
         if animation_type is not None:
             await self._wr(nn20.settings_frame({"animation_type": animation_type}))
@@ -378,7 +384,7 @@ class Nn20Session:
                 except Exception as e:
                     self.log("write failed at packet %d: %s" % (i, e))
                     retries += 1
-                    if retries > 3:
+                    if retries >= ACK_ABORT_FAILURES:
                         raise ProtocolError("link lost while sending packet %d" % i)
                     await self._recover(e)
                     i = 0           # the badge lost its place: start the stream again
@@ -401,7 +407,7 @@ class Nn20Session:
                 i += good
                 if failed:
                     retries += 1
-                    if retries > 3:
+                    if retries >= ACK_ABORT_FAILURES:
                         raise ProtocolError("badge did not acknowledge packet %d" % i)
                     batch = 1
                     await asyncio.sleep(min(0.5 * 2 ** (retries - 1), 2.0))

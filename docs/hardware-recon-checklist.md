@@ -1,5 +1,7 @@
 # Hardware Reconnaissance and Flash Endurance Checklist
 
+> Executable version: the step-by-step task pack in [tasks/README.md](tasks/README.md) (software tasks S0 to S11 in `tasks/SW-RECON.md`, hardware tasks HW-0 to HW-17 in `tasks/HW-RECON.md`) supersedes the procedures below for day-to-day work; this document stays as background for the teardown and flash-endurance reasoning. Known corrections: the only FCC spelling that exists is `2BR3T-BAGDE0`; a discrete SOIC flash may not exist (flash reported inside the SoC package); the H8 rewrite test needs `--no-delta`.
+
 > Cross-reference (added 2026-10): public findings that overlap this checklist are collected in [recon-web.md](recon-web.md) (FCC filing contents, chip and flash reports from third-party teardowns, firmware layout). On fccid.io only `2BR3T-BAGDE0` exists; `2BR3T-BADGE0` returned 404, so treat it as a spelling variant. The filing lists a Bluetooth band only (no Wi-Fi) and keeps the block diagram, schematic and parts list confidential.
 
 Audience: Embedded engineers and autonomous agents working with physical Beambox hardware.
@@ -48,7 +50,6 @@ This checklist defines the empirical verification process for physical Beambox e
 
 - **Lithium Battery Warning:** The badge contains a pouch LiPo cell directly behind the electronics. Never use metal tweezers, scalpels, or excessive heat near the pouch. Disconnect or desolder the positive battery lead immediately upon opening the casing.
 - **Voltage Rail Safety:** Wearable NOR flash commonly runs on 1.8V logic. Never attach a 3.3V/5V programmer without first measuring the flash chip's VCC with a multimeter while the device is on.
-- **Firmware Dump Policy:** Binary dumps contain vendor copyright assets. Compute cryptographic hashes (SHA-256) and store dumps locally; never commit binary blobs to the public repository.
 
 ## 3. Non-Destructive Software Probes (Phase 1)
 

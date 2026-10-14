@@ -3,6 +3,8 @@
 Update: the product owner identifies Pulse as the NIKKO model of the NN family (flagship, standard display, four wearing styles). See docs/models.md for the model comparison, transport per model and third-party hardware reports. Statements below that say the Pulse transport is probably BadgeSdk are superseded: NN-family units reported by third parties use the nn20 service 0x01F0, so the client defaults to nn20 for stills as a one-frame type 5 container.
 
 
+Facts that sources disagree on (screen size, picture size, chip): docs/FACTS.md.
+
 Scope: static reading of Beambox+ 1.0.14 (package com.guangshen.beambox). Tags: [C] confirmed from code, [I] inferred, [U] unknown.
 
 ## 1. Pulse-specific data in the app
@@ -15,7 +17,7 @@ Scope: static reading of Beambox+ 1.0.14 (package com.guangshen.beambox). Tags: 
 ## 2. Resolution
 - [C] BadgeSdk path: the badge reports its picture size (0xC7 and 0xDB); the app uses it. No per-model table. The client does the same and falls back to 360x360.
 - [C] nn20 path: the app builds 368x368 JPEGs (quality 90) for still and animation containers; some code paths hard-code 360x360 and a 240x240 sticker canvas; the IMB header only supports 368 or 360.
-- [I] 360x360 circular area is the working assumption for a round badge; the client's default.
+- [I] 360x360 circular area is the working assumption for a round badge; the client's default. Screen size, 360 versus 368 and the client rule: docs/FACTS.md.
 
 ## 3. Feature support the app shows
 - Stills: gallery picker and crop, JPG and PNG (Glide/Bitmap), flattened to RGB, scaled to the square. [C]

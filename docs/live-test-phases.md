@@ -1,193 +1,139 @@
 # Live test phases (real badge)
 
-Task brief for the agent running the first live tests on a real badge. The phases are written all at once, but they run **one at a time**: after each phase, stop, send the phase report to the owner, and wait. The owner and the planning model may rewrite later phases based on what you found. Never start the next phase on your own.
+Task brief for the agent running the first live tests on a real badge. Phases run in batches (below); after each batch, stop, send the reports to the owner and wait. Later phases may be rewritten from the results. Never start the next batch on your own.
 
-Related docs (read before Phase 0): [first-session-checklist.md](first-session-checklist.md), [hardware-test-v1.md](hardware-test-v1.md) (tests H1 to H7), [safe-write.md](safe-write.md), [PROTOCOL.md](PROTOCOL.md), [models.md](models.md), [wifi-protocol.md](wifi-protocol.md), [problem_solution.md](problem_solution.md).
+Read first: [AGENTS.md](../AGENTS.md) (binding rules, safety with real badges), [FACTS.md](FACTS.md) (disputed values), [first-session-checklist.md](first-session-checklist.md), [hardware-test-v1.md](hardware-test-v1.md) (H1 to H7), [safe-write.md](safe-write.md), [PROTOCOL.md](PROTOCOL.md), [wifi-protocol.md](wifi-protocol.md), [problem_solution.md](problem_solution.md), [steps.md](steps.md).
 
-## Batch mode (3 checkpoints instead of 9)
+## Branch
 
-Phases can be grouped into batches. Run a whole batch, then report once with one report block per phase. Inside a batch, continue to the next phase only if the gate passes; otherwise stop the batch and report.
-
-| Batch | Phases | Gate to continue inside the batch | Why grouped |
-| :--- | :--- | :--- | :--- |
-| A | P0, P1, P2, plus P8 step 1 (touch, NIJI only) | P0 tests green; P2 transport identified | No rebeambox writes, nothing to tune between them |
-| B | P3, P4, P5 | P3 shows the picture; in P4 at least one still mode works; in P5 stop at the first freeze | All writes on the one transport P2 chose; failures follow the stop rules already in each phase |
-| C | P6, P7, P8 wrap-up | P6 no 2 failures in a row; P7 only if an SSID was seen | Speed and Wi-Fi measurements; wrap-up needs all results |
-
-Not concurrent: the badge accepts one central at a time, so the vendor app, nRF Connect and rebeambox never run at the same moment. P1 (vendor app) and P0 (computer only) can run side by side. Running all phases in one go is not recommended: if P3 fails, P4 to P7 just burn flash writes on a broken path.
+Run from `docs/grok-improvements` only after it contains `origin/main`, `origin/feat/steps-log` and `origin/integration/2026-10-12` (check: `git merge-base --is-ancestor origin/main HEAD && echo ok`, same for the other two). Those carry the `--model` size fix (problem 58), the daily write cap (59), the fail-closed ledger and OTA block (77) and the capture scrubber. Record `git log -1 --oneline` in every report.
 
 ## Rules for the agent
 
-1. **One phase per run.** Finish the phase, fill its report, stop. If a stop condition triggers, stop right there and report what you have.
-2. **Do not change code** in `rebeambox/` during a phase. If something looks wrong, record it; fixes are made between phases after review. The one exception is a scratch copy where a phase says so.
-3. **Log every problem** in [problem_solution.md](problem_solution.md) as a new numbered entry at the bottom (next number after the last one), in the existing format: date, phase (`Live P<n>`), problem, cause (or "unknown"), solution or `Status: Unsolved` with what was tried. Small problems count too (a missing tool, a permission prompt, a flag that did not exist).
-4. **Record everything.** Every command with `2>&1 | tee live/p<n>/<step>.txt`. A failure with a log beats a success without one. Photo or short video of the badge after every write.
-5. **Write budget.** Each image, GIF, video or text send is a flash write. Stay inside the budget for each phase. Do not use `--force` or `--no-safe-write` unless the phase says so. Check the counter with `rebeambox uploads` at the start and end of every phase.
-6. **Redact** the last 3 bytes of Bluetooth addresses, Wi-Fi passwords and serial numbers in anything you send back.
-7. **Do not guess.** If the output does not match what this brief expects, write down what you saw, not what you think it means. Mark claims as Observed or Inferred.
-8. **One central at a time.** Close the vendor app (force stop) whenever rebeambox talks to the badge, and the other way round.
+1. **One batch per run.** Inside a batch, continue only if the gate passes; on a stop condition, stop and report.
+2. **No code changes** in `rebeambox/` during a run. Record, do not fix.
+3. **Logs, per AGENTS.md:**
+   - Every step and decision: append to [steps.md](steps.md) (step + rationale).
+   - Every problem, even small: new entry in [problem_solution.md](problem_solution.md) numbered **last existing number + 1** (check with `grep "^## [0-9]" docs/problem_solution.md | tail -1`; never reuse a number). Phase field: `Live P<n>`.
+4. **Redact before writing to disk**, not only in reports (the repo is public). Bluetooth addresses: last 3 bytes as `XX`. No Wi-Fi passwords, serials or phone numbers in any file under the repo. Raw captures stay in `live/` (git-excluded); anything derived from a capture goes through `python tools/scrub_capture.py <in> -o <out> --mask <serial>` before it lands in `docs/`, `reports/` or `fixtures/`. `probe --qualify` redacts by default; never pass `--no-redact`.
+5. **Write budget.** Every image, GIF, video or text send is a flash write. The guard (30 s minimum interval, delta skip, hard cap 50 per 24 h, warning at 40) stays on. Never use `--force`, `--no-safe-write` or `--max-per-day`. The only allowed guard flags are the ones a phase names. Check `rebeambox uploads` at the start and end of each phase.
+6. **Owner confirms the screen.** A clean exit or an ACK does not prove the picture rendered. For every write the pass condition needs the owner's answer to: shown? oriented? cropped? garbled? Ask, wait for the answer, record it with a photo.
+7. **Time every transfer** (`time ...`) and keep the console log: throughput comes from the P3 to P5 sends, not from extra writes.
+8. **One central at a time.** Force stop the vendor app and disconnect nRF Connect before rebeambox talks to the badge.
+9. **Do not guess.** Separate Observed from Inferred. Unexpected reply: stop, record, do not retry in a loop.
+10. Results go in `live/p<n>/` (in `.git/info/exclude`). Log every command with `2>&1 | tee live/p<n>/<step>.txt`.
 
-## Skills to use
+## Skills
 
 | Skill | When | Why |
 | :--- | :--- | :--- |
-| `repo-builder` | Start of Phase 0 | Orient in the repo: find the real install, test and run commands and conventions instead of guessing them. |
-| `run` | Phases 2 to 7, when driving the CLI | Run the app and confirm behaviour in the real program, not only in tests. |
-| `grilling` (optional, owner side) | Between phases | Stress-test the plan for the next phase against the results before rewriting it. |
+| `repo-builder` | Start of each run | Picks up AGENTS.md rules, real commands and the current last problem number instead of trusting this file. |
+| `run` | P1 to P6 | Drive the real CLI and confirm behaviour on the device, not only in tests. |
+| `grilling` (owner side, optional) | Between batches | Stress-test the next batch against the results before running it. |
 
-If a skill is not available to you, do the same steps manually and note it in the report.
+If a skill is unavailable, do the steps by hand and say so in the report.
 
-## Directory layout for results
+## Batches
 
-```
-live/
-  p0/ ... p8/          one folder per phase, all logs, captures, photos
-  media/               the test media (Phase 0 creates it)
-```
-Add `live/` to your local ignore (`.git/info/exclude`), never commit captures.
+| Batch | Phases | Gate inside the batch | Writes (max) |
+| :--- | :--- | :--- | :--- |
+| A | P0, P1, P2 | P0 green; P1 finds the badge and a transport | 2 (vendor app, P2) |
+| B | P3, P4, P5 | P3 shown (owner); P4 one still mode works; P5 stops at the first freeze | 3 + 5 + 5 = 13 |
+| C | P6, P7, P8 | P6 no 2 failures in a row; P7 only with an SSID and a second network | 3 + 1 = 4 |
+
+Total rebeambox writes at most 18, well under the 40/day warning. Run batch B and C on different days if B used its full budget plus retries.
 
 ---
 
-## Phase 0. Preflight (no badge contact)
+## P0. Preflight (no badge contact). Writes: 0
 
-- **Goal:** a working toolchain and known-good test media before the badge is touched.
-- **Rationale:** if tests or tools fail now, any later badge failure is ambiguous. Costs nothing, saves hours.
-- **Write budget:** 0.
-- **Steps:**
-  1. Use `repo-builder` to orient. `git pull`, `git log -1 --oneline` (record the commit).
-  2. `python -m venv .venv && source .venv/bin/activate && pip install -e .[test]`.
-  3. `python -m pytest -q tests` (expect about 303 passed, 2 skipped). Record exact counts.
-  4. `rebeambox --version`, `python -c "import bleak; print(bleak.__version__)"`, `ffmpeg -version | head -1`, OS version, Bluetooth adapter (macOS: `system_profiler SPBluetoothDataType | head -30`).
-  5. Simulator dry run of the whole flow: `rebeambox probe --qualify --simulate nn20` and `--simulate badge`.
-  6. Build `live/media/`: `photo.jpg` (any), `gradient.png` (360x360, labelled `TOP-LEFT` corner and a red arrow pointing up), `party.gif` (about 20 frames), `clip2.mp4 clip3.mp4 clip4.mp4 clip5.mp4 clip8.mp4 clip10.mp4` (generate with ffmpeg `testsrc2` showing a timer, e.g. `ffmpeg -f lavfi -i testsrc2=size=368x368:rate=15 -t 8 live/media/clip8.mp4`).
-  7. Dry runs of every send type with `--dry-run live/p0/dry-<kind>.txt` for `--transport nn20`, `badge`, `wifi`. Record payload sizes.
-  8. `rebeambox uploads` (expect empty).
-- **Pass:** tests green, both simulations PASS, all dry runs produce files.
-- **Stop if:** any test fails or a simulation fails. Report and wait.
-- **Report:** fill the report block (end of this file) plus a table of tool versions and payload sizes.
+- **Rationale:** a broken toolchain makes every later badge failure ambiguous.
+- **Steps:** branch check (above); `python -m venv .venv && source .venv/bin/activate && pip install -e '.[test]'` (quotes needed in zsh, problem 78); `python -m pytest -q`; versions: `rebeambox --version`, `python -c "import importlib.metadata as m; print(m.version('bleak'))"` (problem 79), `ffmpeg -version | head -1`, OS, adapter; `rebeambox probe --qualify --simulate nn20` and `--simulate badge`; `python tools/make_test_media.py --out live/media`; dry runs of image, GIF, video and text for `--transport nn20`, `badge`, `wifi` into `live/p0/`, record payload sizes; `rebeambox uploads`.
+- **Pass:** tests green (record counts in the report, not in docs), both simulations PASS, dry runs written.
+- **Stop if:** any of those fail.
 
-## Phase 1. Vendor app reference capture (ground truth)
+## P1. Read-only recon (+ touch listen). Writes: 0
 
-- **Goal:** a btsnoop capture of the vendor app sending one still and one animation.
-- **Rationale:** every later byte comparison needs this. If our client fails, this capture tells us whether our bytes or our assumptions are wrong. Done before rebeambox so the badge is in a known factory-like state.
-- **Write budget:** 2 (vendor app writes).
-- **Steps:**
-  1. Charge the badge above 50 percent. Record model printed on the box, the model selected in the app, app version, badge firmware version if shown.
-  2. Android: Developer options, enable Bluetooth HCI snoop log, toggle Bluetooth off and on.
-  3. In the vendor app: connect, send `photo.jpg`, wait for the badge to show it, then send `party.gif`. Note the wall-clock time of each action and what the badge showed.
-  4. Pull the log (first-session-checklist.md step 1.3). Save as `live/p1/ref-<model>-<date>.btsnoop`.
-  5. `python tools/replay_pcap.py live/p1/ref-*.btsnoop --out live/p1/extracted/ 2>&1 | tee live/p1/replay.txt`.
-  6. Check the phone Wi-Fi list for an SSID containing `E-Badge`; record it (decides Phase 7).
-- **Pass:** capture contains ATT writes to the badge; replay tool extracts frames.
-- **Stop if:** no capture can be pulled (record phone model and Android version, try the bugreport path, then stop).
-- **Report:** advertised name seen by the app, which service handle was written (0x01F1 or RCSP), first 5 frames in hex, replay CRC and sequence results, Wi-Fi SSID yes/no.
+- **Rationale:** zero risk to flash; proves the host Bluetooth stack sees the badge and decides the transport before any manual capture work. Runs before the vendor capture so a host-side problem is found first.
+- **Steps (H1):** vendor app force stopped, badge on its pairing screen. `rebeambox scan --all --timeout 15`; `rebeambox scan --model <model> --timeout 15`; `rebeambox probe <ADDRESS> --json live/p1/gatt.json`; `rebeambox probe --qualify --model <model> --report-dir live/p1`. Record the status JSON fields the badge reports (`size`, `freespace`, `time_mode`) next to what `--model` would assume.
+- **Touch (NIJI only, H6):** nRF Connect, enable every notifiable characteristic, tap, swipe, long-press 10 times each, export the log. Other models: "skipped".
+- **Pass:** qualify PASS, transport identified (nn20 or badge).
+- **Stop if:** not found with `--all`, or neither 0x01F0 nor the 0x9E/RCSP service. Write nothing.
 
-## Phase 2. Passive recon (read-only)
+## P2. Vendor app reference capture. Writes: 2 (vendor app)
 
-- **Goal:** name, services, MTU, transport decision, read-only handshake.
-- **Rationale:** zero writes, so zero risk to flash, and it decides which transport every later phase uses.
-- **Write budget:** 0.
-- **Steps (H1):**
-  1. Vendor app force stopped. Badge on its pairing screen.
-  2. `rebeambox scan --all --timeout 15`, then `rebeambox scan --model <model> --timeout 15`.
-  3. `rebeambox probe <ADDRESS> --json live/p2/gatt.json`.
-  4. `rebeambox probe --qualify --model <model> --report-dir live/p2`.
-  5. Optional cross-check: nRF Connect, export XML of the GATT table.
-- **Pass:** qualify says PASS, transport identified (nn20 or badge).
-- **Stop if:** badge not found with `--all`, or neither 0x01F0 nor the 0x9E/RCSP service exists. Do not write anything.
-- **Report:** the first-contact report file, transport decision, MTU, manufacturer data, whether the model filter found it (if not, which name it used).
+- **Rationale:** ground truth bytes for every comparison later; if our client fails, this tells us whether bytes or assumptions are wrong.
+- **Steps:** Android HCI snoop on, Bluetooth off and on; in the app send `photo.jpg`, wait for it to show, then a GIF; note wall-clock times and what the badge showed. Pull the log to `live/p2/ref-<model>-<date>.btsnoop` (first-session-checklist.md 1.3). `python tools/replay_pcap.py live/p2/ref-*.btsnoop --out live/p2/extracted/`. Check the phone Wi-Fi list for `E-Badge*`.
+- **Pass:** capture has ATT writes to the badge; replay extracts frames.
+- **Report:** handle written (0x01F1 or RCSP), first 5 frames as lengths and opcodes (scrubbed), CRC/sequence results, SSID yes/no.
 
-## Phase 3. First write: one still
+## P3. First write: one still. Writes: max 3
 
-- **Goal:** one picture on the badge from rebeambox.
-- **Rationale:** smallest possible write that proves the full path (connect, framing, checksum, ack). Only one transport, the one Phase 2 chose, so a failure points at one code path.
-- **Write budget:** up to 3.
-- **Steps:**
-  1. Start an HCI capture on the computer (macOS PacketLogger, Linux `sudo btmon -w live/p3/rb.btsnoop`).
-  2. `rebeambox send-image live/media/gradient.png --model <model> --address <ADDRESS>` (auto transport).
-  3. If it fails: power-cycle, retry once with the transport forced (`--transport nn20` or `badge`).
-  4. If still failing: stop. Do not try other encodings, that is Phase 4.
-  5. `rebeambox uploads`.
-- **Pass:** gradient visible, correctly oriented, within 30 s.
-- **Stop if:** badge reboots, freezes, or two attempts fail.
-- **Report:** photo, time to finish, console output, orientation and crop, whether circle or square, capture file, diff of our first 5 frames vs Phase 1 frames (lengths and opcodes).
+- **Rationale:** smallest write that proves the full path, on the one transport P1 chose, so a failure points at one code path.
+- **Steps:** start an HCI capture (macOS PacketLogger, Linux `sudo btmon -w live/p3/rb.btsnoop`). `time rebeambox send-image live/media/gradient_label.png --model <model> --address <ADDRESS>`. Owner confirms the screen. If it fails: power-cycle, retry once with `--transport nn20` or `badge` forced. Then stop.
+- **Pass:** owner confirms the picture shown, oriented, within 30 s.
+- **Stop if:** reboot, freeze, or two failures.
+- **Report:** owner's answer + photo, seconds, bytes, our first 5 frames vs P2 frames (lengths, opcodes).
 
-## Phase 4. Still encoding and geometry matrix
+## P4. Still encoding and geometry. Writes: max 5
 
-- **Goal:** confirm which still mode and size are right for this model (H2, and H3 if BadgeSdk).
-- **Rationale:** the code default (type 5 container) comes from third-party reports; the app code uses type 6 album. Only hardware settles it. Size 360 vs 368 decides the crop.
-- **Write budget:** up to 6, at least 30 s apart (the safe-write default enforces this, do not override).
-- **Steps:**
-  1. nn20: `--nn20-still gif` (type 5) and `--nn20-still album` (type 6), power-cycle between them.
-  2. With the working mode: `--size 360`, `--size 368`, `--square`.
-  3. BadgeSdk only: watch the log for the auth exchange (challenge, reply, `pass`). Skip the wrong-key test unless the owner says the badge is a spare.
-  4. Send the same image twice in a row without changes: expect the second send to be skipped by the delta rule (no write). Record.
-- **Pass:** one mode shows the image correctly; the delta skip works.
-- **Report:** a table mode x size -> result (ok, black, cropped, garbled, nothing), photos, recommended `still_mode` and size for `rebeambox/models.py` (do not edit it).
+- **Rationale:** type 5 container (default, third-party reports) vs type 6 album (app code); 360 vs 368 decides the crop. Only the screen settles it.
+- **Steps:** nn20: the default (type 5) was P3; send `--nn20-still album` (type 6) once. With the mode that worked, try the other size of 360/368 (P1 told you which one the badge reports; the default now follows the badge), then `--square` once if the circle crops the labels. Then send the last image again unchanged: expect the delta rule to skip it (no write); record. BadgeSdk badges: replace with the auth check from H3 (a), log challenge/reply/`pass`; no wrong-key test.
+- **Pass:** owner confirms one mode and size render correctly; delta skip observed.
+- **Report:** table mode x size -> owner's verdict (ok, black, cropped, garbled, nothing), seconds, bytes; recommendation for `still_mode` and size (do not edit code).
 
-## Phase 5. Animation, video, text, length limit
+## P5. GIF, text, video length boundary. Writes: max 5
 
-- **Goal:** GIF, video and text work, and the real video length limit (H7).
-- **Rationale:** separate from stills because they use another container and larger payloads; the length limit is disputed (3 s retail vs 10 s app trimmer vs 5 s Niji).
-- **Write budget:** up to 10.
-- **Steps:**
-  1. `send-gif live/media/party.gif`; `send-text "Test" --model <model>`.
-  2. Videos in increasing length: 2, 3, 4, 5, 8, 10 s with `send-video clipN.mp4 --max-seconds N --fps 15`. Before and after each, record `freespace` from the status output if printed.
-  3. Film each playback, count the timer seconds shown before it loops.
-- **Pass:** longest fully played clip and shortest failing one identified.
-- **Stop if:** freeze or reboot. Power-cycle, record clip length and size, do not go longer.
-- **Report:** table clip length -> transfer ok, seconds played, loop yes/no, bytes, transfer time; text readability; recommended `video_max_s`.
+- **Rationale:** other container, bigger payloads; length limit disputed (FACTS.md: 3 s retail, 5 s NIJI trimmer, 10 s app default). Boundary search instead of a sweep to save writes.
+- **Steps:** `send-gif live/media/party.gif`; `send-text "Test" --model <model>`. Video, each `--max-seconds N --fps 15`, owner counts the on-screen timer before it loops:
+  1. 5 s. Plays fully: go to 3. Fails or truncates: send 3 s, stop.
+  2. 10 s. Plays fully: limit at least 10, stop. Fails: send 8 s only if budget left.
+- **Pass:** the longest clip that plays fully and the shortest that fails (or "at least 10 s").
+- **Stop if:** freeze or reboot; power-cycle, record length and bytes, go no longer.
+- **Report:** table length -> transfer ok, seconds played, loop, bytes, transfer seconds, `freespace` before/after.
 
-## Phase 6. BLE throughput and reliability
+## P6. BLE throughput check. Writes: max 3
 
-- **Goal:** real transfer speed and failure rate (H4).
-- **Rationale:** the streaming plan depends on these numbers; repetition exposes intermittent drops a single send hides.
-- **Write budget:** up to 10. Note: back-to-back sends need `--min-interval-s 5` (allowed here only). Do not use `--force`.
-- **Steps:**
-  1. `time rebeambox send-gif live/media/party.gif --model <model> --address <ADDRESS> --min-interval-s 5 --no-delta` five times.
-  2. Repeat five times with `--packet-interval-ms 10` only if all first five succeeded.
-  3. Compute bytes per second from the dry-run payload size.
-- **Pass:** no disconnects. Speed is recorded, not judged (prediction: nn20 no-ack about 22 KB/s, ack about 9 KB/s, BadgeSdk 10 to 30 KB/s).
+- **Rationale:** P3 to P5 already give timings over several payload sizes. This adds only a short repeat to see drops on back-to-back sends.
+- **Steps:** compute KB/s for every P3 to P5 transfer first (payload bytes from P0 dry runs / seconds). Then 3 runs of `time rebeambox send-gif live/media/party.gif --model <model> --address <ADDRESS> --no-delta --min-interval-s 10` (both flags are documented CLI options of the guard; the hard cap stays on). Different image each run is not needed: `--no-delta` sends the full payload.
+- **Pass:** no disconnects. Speed recorded, not judged (prediction: nn20 no-ack ~22 KB/s, ack ~9 KB/s, BadgeSdk 10 to 30 KB/s).
 - **Stop if:** 2 failures in a row.
-- **Report:** per run: seconds, bytes, KB/s, retries, any GetPacketFail, ack mode, MTU.
 
-## Phase 7. Wi-Fi (only if Phase 1 or 2 found an E-Badge SSID)
+## P7. Wi-Fi (only if an `E-Badge*` SSID was seen). Writes: max 1 + stream test
 
-- **Goal:** Wi-Fi upload and camera-mode streaming fps (H5).
-- **Rationale:** Wi-Fi camera mode is the only live (non-flash) path, which matters for streaming without wear.
-- **Write budget:** 2 still uploads; streaming frames are not counted as flash writes if camera mode is confirmed.
-- **Steps:** follow hardware-test-v1.md H5: join SSID, `nmap -Pn -p 80,8080 192.168.8.1`, `tcpdump` capture, `send-image --transport wifi`, `stream clip8.mp4 --fps 2`, then `--fps 3`. Do not edit `MIN_FRAME_INTERVAL` in this phase.
-- **Pass:** image shows; stream gets the 0x007B reply; 3 fps smooth.
-- **Report:** password needed y/n, IP lease, open ports, reply bytes, fps where stutter begins, capture file. If skipped, say "skipped: no SSID".
+- **Rationale:** camera mode is the only possibly flash-free live path; that claim must be proven before any streaming loop.
+- **Pre-check (stop if it fails):** joining the badge AP drops internet on that adapter. The agent must stay connected: use Ethernet or USB tethering for internet and Wi-Fi for the badge, or a second USB Wi-Fi adapter, or have the owner run P7 by hand from the commands below and paste the outputs. Confirm with `route get default` (macOS) / `ip route` (Linux) that the default route is not the badge.
+- **Steps:** join the SSID (wifi-protocol.md 2), record whether a password was needed (do not write it down); `nmap -Pn -p 80,8080 192.168.8.1` once; `sudo tcpdump -i <wlan> -w live/p7/wifi.pcap host 192.168.8.1`.
+  1. Persistence check: `rebeambox send-image live/media/gradient_label.png --transport wifi` (1 write). Owner confirms shown. Power-cycle: if the image is still there after reboot, uploads are persistent (flash).
+  2. Camera mode: `rebeambox stream live/media/clip5.mp4 --fps 2 --max-seconds 5`. Expect the 0x007B reply. Then power-cycle: if the last streamed frame survives the reboot, camera mode writes to flash: **stop, do not run higher fps**, report.
+  3. Only if frames do not survive: `--fps 3`, 10 s. Do not edit `MIN_FRAME_INTERVAL`.
+- **Report:** password needed y/n, IP lease, open ports, reply bytes, persistence results for 1 and 2, fps where stutter begins.
 
-## Phase 8. Touch events (NIJI only) and wrap-up
+## P8. Wrap-up. Writes: 0
 
-- **Goal:** check for touch notifications (H6), then a final summary.
-- **Rationale:** cheap, read-only, and closes the last open protocol question. Wrap-up turns findings into concrete change requests.
-- **Write budget:** 0.
-- **Steps:**
-  1. NIJI only: nRF Connect, enable all notifications, tap, swipe, long-press 10 times each, export log. Other models: skip, write "skipped".
-  2. `rebeambox uploads` final count.
-  3. Write `live/SUMMARY.md`: per phase one line PASS/FAIL/PARTIAL/SKIPPED, the list of suggested code and doc changes (file, current value, proposed value, evidence), and the list of problem_solution.md entries added.
+- `rebeambox uploads` final count.
+- `live/SUMMARY.md`: one line per phase PASS/FAIL/PARTIAL/SKIPPED; proposed code and doc changes (file, current value, proposed value, evidence tag `[H]` with the report that proves it); list of problem_solution.md entries and steps.md lines added.
 
 ---
 
-## Report block (send this after every phase)
+## Report block (one per phase, sent at the end of each batch)
 
 ```
 LIVE TEST REPORT, Phase <n>: <name>
 date / time zone:            repo commit:
-model (box / app):           firmware / app version:
+model (box / app / badge-reported):   firmware / app version:
 computer OS, Python, bleak:  adapter:
 writes used / budget:        uploads counter before -> after:
 
-RESULT: PASS | PARTIAL | FAIL | STOPPED (which stop condition)
+RESULT: PASS | PARTIAL | FAIL | STOPPED (which stop condition) | SKIPPED
 
-commands run (in order, with log file name):
+commands run (in order, log file):
+owner screen confirmations (per write):
 observed (facts only):
-inferred (your interpretation, labelled):
-measured values (table if more than 3):
-photos / captures (file names):
-problem_solution.md entries added (numbers):
-questions for the owner before the next phase:
+inferred (labelled):
+timings (bytes, seconds, KB/s):
+files (photos, scrubbed captures):
+problem_solution.md entries added:
+steps.md lines added:
+questions before the next batch:
 ```

@@ -558,3 +558,9 @@ Entry format: date, phase, problem, cause, solution (or Status: Unsolved plus wh
 - Cause: Newer versions of bleak (installed: 3.0.2) do not expose `__version__` on the top-level package namespace.
 - Solution: Query package version via `importlib.metadata.version('bleak')`. Status: Solved.
 
+
+## 80. Live test brief written on a stale branch
+- Date: 2026-10-14. Phase: Live planning.
+- Evidence: `docs/live-test-phases.md` was first written on `docs/grok-improvements` after a `git pull` that only updated that branch; `origin/main` already held problems 57-77, the daily write cap, the `--model` size fix, `docs/steps.md` and AGENTS.md. The brief told agents to number problems from 57 and did not mention steps.md (found by an external review).
+- Cause: the planner checked the current branch only, not how far it was behind `main`.
+- Solution: branch merged with main, feat/steps-log and integration; brief rewritten: branch check, last+1 numbering, steps.md, on-disk redaction with `tools/scrub_capture.py`, recon before vendor capture, owner screen confirmation, write budget cut from 31 to 18 (boundary video search, throughput from existing sends), Wi-Fi persistence and second-network pre-check. Lesson: before planning, run `git fetch --all` and compare the branch with `origin/main`. Status: Solved.

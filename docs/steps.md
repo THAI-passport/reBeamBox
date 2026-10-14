@@ -36,3 +36,8 @@ Earlier day-to-day detail lives in those logs; new work appends here.
   - **Rationale:** The working branch `docs/grok-improvements` had `docs/live-test-phases.md` but lacked recent safety critical fixes and `docs/steps.md`. Merging combined all safety mechanisms, test harnesses, and documentation cleanly without conflicts.
 - **Step:** Prepared local `.venv` (Python 3.13, bleak 3.0.2, Pillow 12.3.0, pytest 9.1.1), verified test suite (365 passed, 2 skipped, 1 deselected) and repo rules. Generated full synthetic media in `live/media/` and completed Phase 0 dry runs across all transports (nn20, badge, wifi).
   - **Rationale:** Satisfy Phase 0 preflight gates before any hardware contact.
+
+## 2026-10-14 — live test brief revised after external review
+
+- **Step:** Rewrote `docs/live-test-phases.md`: recon (P1) before vendor capture (P2), touch listen folded into recon, owner screen confirmation per write, budget 18 writes (P5 boundary search, P6 3 runs), Wi-Fi persistence check and second-network pre-check, on-disk redaction, last+1 problem numbering, steps.md logging. Logged problem 80.
+  - **Rationale:** Review found the brief predated main's safety changes (daily cap, ledger, steps log) and spent flash writes where existing sends already give the data.

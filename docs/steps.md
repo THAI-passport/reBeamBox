@@ -29,3 +29,10 @@ Earlier day-to-day detail lives in those logs; new work appends here.
 
 - **Decision:** Add `docs/steps.md` and require append-on-every-step in AGENTS.md (with reWatch and reWork).
   - **Rationale:** Owner instruction. Problem/SOP logs capture pitfalls and procedure; the decision trail (why a pin, why a branch, why a constant) was not required in one place.
+
+## 2026-10-14 — live test suite preparation (Batch A / Phase 0 Preflight)
+
+- **Step:** Merged `origin/main` (containing PR #1: Jieli OTA block by RCSP opcode, fail-closed upload ledger, capture scrubber, safe-write daily cap, scan watch tag 0xB9, and free space margin fixes) and `origin/feat/steps-log` into `docs/grok-improvements`.
+  - **Rationale:** The working branch `docs/grok-improvements` had `docs/live-test-phases.md` but lacked recent safety critical fixes and `docs/steps.md`. Merging combined all safety mechanisms, test harnesses, and documentation cleanly without conflicts.
+- **Step:** Prepared local `.venv` (Python 3.13, bleak 3.0.2, Pillow 12.3.0, pytest 9.1.1), verified test suite (365 passed, 2 skipped, 1 deselected) and repo rules. Generated full synthetic media in `live/media/` and completed Phase 0 dry runs across all transports (nn20, badge, wifi).
+  - **Rationale:** Satisfy Phase 0 preflight gates before any hardware contact.

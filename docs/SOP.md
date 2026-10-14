@@ -317,3 +317,9 @@ General rule used throughout: probe a tool with a version command or a ten-secon
 Generic lessons from this repo that belong in reWork's skills. Delete a line once it is folded in there.
 - None open. Folded on 2026-10-12: imported-document disputes (re-protocol-spec), simulator assumption constants (re-client-sim), payload size table (re-hardware-recon).
 - Open: numeric constants must be confirmed in smali (SOP 12.4) and the checker should flag a named library constant used in an arithmetic expression; fold into re-protocol-spec.
+
+## Lessons ported from reWatch (2026-10-14)
+- Jieli OTA shares the 0xAE00 RCSP link, so block OTA by opcode (0xE0-0xEF, top level and inner) in the frame builder and again in every link, not only by service UUID.
+- A write ledger that cannot be read must refuse writes until a person resets it; never rename it away and start from zero.
+- Scrub capture summaries with `tools/scrub_capture.py` before committing; review the output by eye.
+- Reusable lessons go to reWork (skills and docs/SOP.md); this repo keeps target-specific ones.

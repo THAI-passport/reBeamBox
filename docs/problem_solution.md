@@ -546,3 +546,15 @@ Entry format: date, phase, problem, cause, solution (or Status: Unsolved plus wh
 - Cause: OTA was thought of as a separate service; the ledger chose availability over safety.
 - Solution: opcode block 0xE0-0xEF in `rcsp.pack` and in BleakLink/RecordingLink (PROTOCOL 3.7.3); the ledger refuses writes, even with `--force`, until `rebeambox uploads --reset`. Tests added; the old test that pinned the reset behaviour now pins the new rule. Status: Solved in code; untested on hardware (no OTA frame is ever sent, so nothing to test there).
 
+## 78. zsh glob error on pip install -e .[test]
+- Date: 2026-10-14. Phase: Live P0.
+- Evidence: Running `pip install -e .[test]` in zsh produces `zsh: no matches found: .[test]`.
+- Cause: zsh interprets square brackets as pattern globbing instead of pip extra syntax.
+- Solution: Quote the target as `'.[test]'` or `'rebeambox[test]'`. Status: Solved.
+
+## 79. bleak.__version__ AttributeError in bleak >= 0.22 / 3.0
+- Date: 2026-10-14. Phase: Live P0.
+- Evidence: `python -c "import bleak; print(bleak.__version__)"` failed with `AttributeError: module 'bleak' has no attribute '__version__'`.
+- Cause: Newer versions of bleak (installed: 3.0.2) do not expose `__version__` on the top-level package namespace.
+- Solution: Query package version via `importlib.metadata.version('bleak')`. Status: Solved.
+

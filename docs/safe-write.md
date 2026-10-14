@@ -10,6 +10,7 @@ What it does (module `rebeambox/safewrite.py`):
 - Warnings, not refusals: more than 40 writes in 24 hours, or more than 10,000 writes to one badge in total (thresholds configurable, 0 turns a warning off).
 - The counter is advanced only after the upload finished without error, so a failed attempt is not counted. The check runs after connecting (the payload depends on the size the badge reports) and before the first data frame, so a skipped upload writes nothing to the badge's flash.
 - `--dry-run` never reads or writes the counter.
+- Fail closed: if `uploads.json` exists but cannot be read (truncated, wrong shape), every write is refused, `--force` included, and the file is left in place. `rebeambox uploads` shows the error; inspect the file, then `rebeambox uploads --reset` is the deliberate way out. (Until 2026-10-14 a damaged file was renamed to `.bad` and counting restarted at zero, which silently reset the daily cap.)
 
 Flags (all send commands): `--min-interval-s N`, `--max-per-day N`, `--warn-per-day N`, `--warn-total N`, `--force` (ignore interval, daily cap and unchanged-image skip), `--no-delta` (keep the interval but resend identical images), `--no-safe-write` (policy and counting off), `--badge-id NAME`, `--state-dir DIR`. Command `rebeambox uploads` prints the counters; `rebeambox uploads --reset` clears them.
 
@@ -20,4 +21,4 @@ Limits and notes:
 - Counting is per machine. Two computers talking to one badge keep separate counters.
 - Hardware tests H8 and H9 in [hardware-recon-checklist.md](hardware-recon-checklist.md) measure free space and rewrite behaviour and may justify different default thresholds. Until then the defaults are conservative guesses, not endurance data.
 
-Tests: `tests/test_safewrite.py` (counter persistence, hashing instead of addresses, skip, interval, warnings, bounded history, corrupt state file, client wiring for nn20, BadgeSdk and Wi-Fi, CLI flags and exit codes).
+Tests: `tests/test_safewrite.py` (counter persistence, hashing instead of addresses, skip, interval, warnings, bounded history, corrupt state file refuses writes, client wiring for nn20, BadgeSdk and Wi-Fi, CLI flags and exit codes).

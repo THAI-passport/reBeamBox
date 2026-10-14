@@ -51,6 +51,7 @@ class Store:
     def __init__(self, directory=None):
         self.dir = state_dir(directory)
         self.path = os.path.join(self.dir, "uploads.json")
+        self.error = None          # set when the ledger exists but cannot be read; writes are then refused
         self.data = self._load()
 
     def _load(self):
@@ -63,11 +64,10 @@ class Store:
             return d
         except FileNotFoundError:
             return {"version": 1, "total": 0, "badges": {}}
-        except (ValueError, OSError):
-            try:                                   # keep the damaged file, start a fresh count
-                os.replace(self.path, self.path + ".bad")
-            except OSError:
-                pass
+        except (ValueError, OSError) as e:
+            # Fail closed: an unreadable ledger must not silently become a zero count. The file is
+            # left in place; `rebeambox uploads --reset` is the deliberate way out.
+            self.error = "upload ledger %s is unreadable (%s); inspect it, then run `rebeambox uploads --reset`" % (self.path, e)
             return {"version": 1, "total": 0, "badges": {}}
 
     def save(self):
@@ -82,6 +82,7 @@ class Store:
 
     def reset(self):
         self.data = {"version": 1, "total": 0, "badges": {}}
+        self.error = None
         self.save()
 
 
@@ -113,6 +114,8 @@ class Gate:
         p = self.policy
         if not p.enabled:
             return []
+        if self.store.error:                       # not bypassed by --force
+            raise Blocked(self.store.error)
         b = self.store.badge(self.key)
         t = self.now()
         if p.delta and not p.force and b["last_hash"] == payload_hash(payload):
@@ -135,6 +138,8 @@ class Gate:
     def commit(self, payload):
         if not self.policy.enabled:
             return
+        if self.store.error:
+            raise Blocked(self.store.error)
         b = self.store.badge(self.key)
         t = self.now()
         b["count"] += 1
@@ -149,6 +154,8 @@ class Gate:
 def report(store, now=time.time):
     t = now()
     lines = ["state file: %s" % store.path, "total uploads recorded: %d" % store.data["total"]]
+    if store.error:
+        lines.append("ERROR: " + store.error)
     for key, b in sorted(store.data["badges"].items()):
         day = sum(1 for x in b["times"] if t - x < DAY)
         last = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(b["last"])) if b["last"] else "-"

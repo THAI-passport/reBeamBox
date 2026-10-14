@@ -540,3 +540,9 @@ Entry format: date, phase, problem, cause, solution (or Status: Unsolved plus wh
 - Cause: the FACTS row was written from the product-list analysis, not from the connect handler.
 - Solution: row corrected and tagged with S6. Status: Solved.
 
+## 77. OTA reachable through RCSP; damaged ledger reset the write cap
+- Date: 2026-10-14. Found while porting lessons from reWatch.
+- Evidence: Jieli's OTA SDK docs place firmware upgrade on 0xAE00 itself (device-pulled blocks, opcode 0xE5) [W]; `rcsp.pack` accepted any opcode. `safewrite.Store._load` renamed an unreadable `uploads.json` to `.bad` and returned a zero count, so the next write passed the daily cap.
+- Cause: OTA was thought of as a separate service; the ledger chose availability over safety.
+- Solution: opcode block 0xE0-0xEF in `rcsp.pack` and in BleakLink/RecordingLink (PROTOCOL 3.7.3); the ledger refuses writes, even with `--force`, until `rebeambox uploads --reset`. Tests added; the old test that pinned the reset behaviour now pins the new rule. Status: Solved in code; untested on hardware (no OTA frame is ever sent, so nothing to test there).
+

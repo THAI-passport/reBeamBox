@@ -132,13 +132,17 @@ def test_times_list_is_bounded(tmp_path):
     assert len(st.badge(g.key)["times"]) == safewrite.KEEP_TIMES and st.badge(g.key)["count"] == safewrite.KEEP_TIMES + 10
 
 
-def test_corrupt_state_file_is_set_aside_and_counting_restarts(tmp_path):
-    open(os.path.join(str(tmp_path), "uploads.json"), "w").write("{not json")
-    st = safewrite.Store(str(tmp_path))
-    assert st.data["total"] == 0 and os.path.exists(os.path.join(str(tmp_path), "uploads.json.bad"))
-    for bad in ("[]", '{"badges": 3}'):
+def test_corrupt_state_file_refuses_writes_until_reset(tmp_path):
+    # Fail closed: a damaged ledger must not silently become a zero count (see test_ota_block too).
+    for bad in ("{not json", "[]", '{"badges": 3}'):
         open(os.path.join(str(tmp_path), "uploads.json"), "w").write(bad)
-        assert safewrite.Store(str(tmp_path)).data["total"] == 0
+        st = safewrite.Store(str(tmp_path))
+        assert st.error
+        with pytest.raises(safewrite.Blocked):
+            safewrite.Gate("x", safewrite.Policy(min_interval_s=0), st).check(b"img")
+        assert open(os.path.join(str(tmp_path), "uploads.json")).read() == bad
+    st.reset()
+    assert safewrite.Store(str(tmp_path)).error is None
 
 
 def test_state_dir_resolution(monkeypatch, tmp_path):

@@ -41,3 +41,9 @@ Earlier day-to-day detail lives in those logs; new work appends here.
 
 - **Step:** Rewrote `docs/live-test-phases.md`: recon (P1) before vendor capture (P2), touch listen folded into recon, owner screen confirmation per write, budget 18 writes (P5 boundary search, P6 3 runs), Wi-Fi persistence check and second-network pre-check, on-disk redaction, last+1 problem numbering, steps.md logging. Logged problem 80.
   - **Rationale:** Review found the brief predated main's safety changes (daily cap, ledger, steps log) and spent flash writes where existing sends already give the data.
+
+## 2026-10-14 — live test Batch A: Phase 1 Read-only recon
+
+- **Step:** Executed passive scan (`rebeambox scan --all --timeout 15`) and probe qualification (`rebeambox probe <UUID> --qualify --report-dir live/p1`) against advertising device `Watch Ultra` (`5301DFC1-xxxx`).
+  - **Rationale:** Execute Live P1 read-only recon before attempting writes or vendor captures.
+  - **Finding:** Target connected and exposed MTU 256, battery 74% (handle 2), and GATT services (Battery 0x180F, Device Info 0x180A, 0xFF10, 0xFF12, Nordic UART Service 6E400001, 0xFF00; manufacturer data 0x314C: 4142d013d7cc1234). Transport identified as `none` because Beambox services (0x01F0 / 0xAE00) are absent. Stop condition triggered cleanly; 0 writes performed. Logged problem 81.

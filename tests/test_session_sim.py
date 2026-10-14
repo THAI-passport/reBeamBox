@@ -70,3 +70,10 @@ def test_nn20_free_space_refusal():
 def test_detect_transport():
     assert client.detect_transport(link.RecordingLink(sim.SimNn20())) == "nn20"
     assert client.detect_transport(link.RecordingLink(sim.SimBadgeSdk())) == "badge"
+
+
+def test_nn20_status_pushes_are_logged_for_free_space_checks():
+    lines = []
+    b = sim.SimNn20(); l = link.RecordingLink(b)
+    run(client.send(l, job(), fast=True, log=lines.append))
+    assert any(x.startswith("badge status: size=") and "freespace=" in x for x in lines)

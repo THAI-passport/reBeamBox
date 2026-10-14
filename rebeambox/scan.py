@@ -4,7 +4,8 @@ import re
 import struct
 
 DEFAULT_NAMES = ("NEO", "B-Device", "E-badge")
-DEVICE_TAGS = {0xB5: "watch", 0xB0: "phone case", 0xB1: "alarm clock", 0xB2: "speaker", 0xB3: "badge"}
+DEVICE_TAGS = {0xB9: "watch",  # [C] smali of the app: WATCH is 0xB9 (an earlier version of this table said 0xB5)
+               0xB0: "phone case", 0xB1: "alarm clock", 0xB2: "speaker", 0xB3: "badge"}
 SHAPES = {0x6C: "square", 0x6D: "circle"}
 
 

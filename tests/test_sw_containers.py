@@ -221,7 +221,7 @@ def test_property_rcsp_pack_unpack():
         opcode = RNG.choice([0x03, 0x07, 0x1B, 0x1C, 0x1D, 0x20, 0x21, 0x27, 0x01])
         command = bool(RNG.getrandbits(1))
         sn, status = RNG.randrange(256), RNG.randrange(256)
-        xm = RNG.randrange(256) if opcode == 0x01 else None
+        xm = RNG.choice([x for x in range(256) if x not in rcsp.OTA_OPCODES]) if opcode == 0x01 else None   # OTA range is refused, see test_ota_block
         payload = rnd(RNG.randrange(0, 200))
         f = rcsp.pack(opcode, payload, command=command, want_response=bool(RNG.getrandbits(1)), sn=sn, status=status,
                       xm_opcode=xm)

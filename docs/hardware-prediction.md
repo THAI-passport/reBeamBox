@@ -48,7 +48,7 @@ Frame size budget for a 360x360 round panel (368 canvas):
 ## 2. Flaws in the current app and protocol design (grounded)
 
 1. [C] **Whole-file upload only**: both paths require the complete JPEG, container or AVI before display; the nn20 envelope even ends with a closing brace sent in the last packet; no partial display or resume.
-2. [C] **ACK batching with timid back-off**: batch of 4, falling to 2 and 1 after errors, 50 ms interval floor, 500/1000/2000 ms retry waits, only 3 retries, then the whole upload fails. Effective rate about 7 to 9 kB/s, so a 40 kB photo takes 4 to 6 s.
+2. [C] **ACK batching with timid back-off**: batch of 4, falling to 2 and 1 after errors, 50 ms interval floor, 500 then 1000 ms retry waits, the third failure aborts the whole upload (S2 2026-10-12). Effective rate about 7 to 9 kB/s, so a 40 kB photo takes 4 to 6 s.
 3. [C] **Fixed pacing instead of link-aware credit**: 10 to 20 ms timers are used regardless of connection interval, MTU or PHY; no requestConnectionPriority, no PHY request in vendor code.
 4. [C] **No streaming mode or direct-draw command**; the only "mode" values are file types and animation_type.
 5. [C] **JPEG-only**; no raw, indexed, delta or partial formats; the animation container repeats a full JPEG for every frame; AVI path adds a heavy ffmpeg dependency (about 20 MB of native FFmpeg libraries in the arm64 split).
@@ -57,7 +57,7 @@ Frame size budget for a 360x360 round panel (368 canvas):
 8. [C] **BadgeSdk uses two GATT links to the same device** (control service and Jieli RCSP) with a hard-coded 1550 ms wait before bind; the control writes use write-with-response and sleep 5 ms inside the GATT callback thread.
 9. [C] **Resolution inconsistency**: 360 constants and 368 hard-coded scaling coexist; the badge reports its own size on the BadgeSdk path but the nn20 path does not ask.
 10. [C] **End-of-transfer guard up to 3 s** and a 300 ms minimum gap between uploads add latency and make quick sequences impossible.
-11. [C] **Free-space check uses an arbitrary 64 KiB margin** and is skipped if the badge never reported space.
+11. [C] **Free-space check uses an arbitrary 1 MiB margin (not 64 KiB, S2 2026-10-12)** and is skipped if the badge never reported space.
 12. [C] **Flash writes for every update** (file-based) with no in-RAM display path, which hurts wear and speed.
 13. [I] The status JSON on the nn20 path appears push-only (no explicit query found), so the app can start without knowing free space.
 14. [C] The device id sent in bind is a hash of device model strings, not a random installation id; weak as an identity.

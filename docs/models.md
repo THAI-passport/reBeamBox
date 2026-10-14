@@ -3,16 +3,18 @@
 Tags: [C] confirmed from the decompiled app (Beambox+ 1.0.14), [W] reported by a third party or vendor page (not verified by us), [I] inferred, [U] unknown. Sources for [W] are listed in section 6.
 
 ## 1. Summary table
+Screen sizes, picture size (360 versus 368), chip and limits have one authoritative place: docs/FACTS.md. The table below summarises and defers to it where sources conflict.
+
 | | NIKKO (Pulse) | NANO (Lite) | NIJI |
 |---|---|---|---|
 | Vendor positioning [W] | Flagship, standard display, four wearing styles (pin, magnet, lanyard, stand) | Essential, lightest, longest standby, pin or keychain, location finding | Specialist, 1.53 inch touch display, GIF, large battery, colour |
-| Screen [W] | 1.8 or 1.83 inch round IPS, 360x360 advertised | round, 360x360 advertised (size not found) | 1.53 inch round IPS plus touch, 360x360 |
+| Screen [W] | round IPS, see FACTS.md section 1 | round, 360x360 advertised (size not found) | 1.53 inch round IPS plus touch, 360x360 |
 | Framebuffer / encoded size | 368x368 expected [I] | 368x368 frames in stock flash [W] | status JSON reports "368,368" [W] |
 | BLE service seen | not reported [U] | 0x01F0 only, no 0xAE00 [W] | 0x01F0 only (01F1 write-no-resp, 01F2 notify) [W] |
 | Transport used | nn20 (BLE) [I] | nn20 (BLE) [W] | nn20 (BLE) [W] |
 | SoC [W] | Jieli BR28 / AC701N family (FCC internal photos, Nikko board YH-GS2501-V0.2) | Jieli BR28 / AC701N, 16 MiB flash, board YH-GS-NANO-V0.2 | Jieli BR28 ("BR28 UDISK" over USB) |
 | Battery [W] | 450-500 mAh class, up to 12 h | 500 mAh | 500 mAh 3.8 V, 5-10 h daily use, 30+ days standby, 8 MB storage, 19 g |
-| Video cap in app trimmer [C] | 10 s window (code); retail says 3 s | 10 s window (code) | 5 s window (code) |
+| Video cap in app trimmer [C] | 10 s window (code); retail claim and client default in FACTS.md | 10 s window (code) | 5 s window (code) |
 
 ## 2. What the app code says about models [C]
 - The app has no model table. The words NIKKO, NANO and NIJI appear in exactly four places: the layout `item_banner.xml` (placeholder text "NIKKO BADGE" on the home banner card), `item_device_card.xml` (placeholder text "NANO" in the device card template, overwritten at runtime by the server record), `strings.xml` `find_string_tag_7` = "NIKKO" (a community filter tag), and one comparison in `IosStyleVideoTrimmerView.setSliderType` (see 4). `m2/g.java`, `a0/j.java` and the `wg` package contain no model names.
@@ -56,4 +58,4 @@ Tags: [C] confirmed from the decompiled app (Beambox+ 1.0.14), [W] reported by a
 
 ## Update from user (2026-10-11)
 
-The user states the Pulse (Nikko) screen is 1.8 inch. This is consistent with third-party reports of 1.83 inch and conflicts with the retail copy that says 1.28 inch; treat 1.8 inch as [W] until measured on hardware.
+Pulse (Nikko) screen size and the conflicting retail values are recorded in docs/FACTS.md section 1.

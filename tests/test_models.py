@@ -14,7 +14,7 @@ def test_profiles_exist_and_are_consistent():
 
 def test_model_defaults_applied_and_overridable():
     a = parse(["send-video", "x.mp4", "--model", "niji"]); cli.apply_model(a)
-    assert a.max_seconds == 5.0 and a.size == 368 and "Niji" in a.name and "E-badge" in a.name
+    assert a.max_seconds == 5.0 and a.size is None and "Niji" in a.name and "E-badge" in a.name
     a = parse(["send-video", "x.mp4", "--model", "niji", "--max-seconds", "2", "--size", "360"]); cli.apply_model(a)
     assert a.max_seconds == 2.0 and a.size == 360
     a = parse(["send-gif", "x.gif"]); cli.apply_model(a)
@@ -33,3 +33,17 @@ def test_model_dry_run(tmp_path):
     out = tmp_path / "o.txt"
     assert cli.main(["send-image", str(img), "--model", "nano", "--dry-run", str(out), "--transport", "nn20", "--quiet"]) == 0
     assert (tmp_path / "o.txt.payload").read_bytes()[:4] == bytes.fromhex("78563412")
+
+
+def test_model_does_not_override_the_size_the_badge_reports(monkeypatch, tmp_path):
+    from PIL import Image
+    seen = {}
+
+    async def fake_send(lk, job, transport, size, *a, **k):
+        seen["size"] = size
+        return b""
+    monkeypatch.setattr(cli.client, "send", fake_send)
+    img = tmp_path / "i.png"
+    Image.new("RGB", (8, 8)).save(img)
+    assert cli.main(["send-image", str(img), "--model", "nikko", "--dry-run", str(tmp_path / "o.txt"), "--quiet"]) == 0
+    assert seen["size"] is None                      # client then uses what the badge reports, 368 only as the last fallback

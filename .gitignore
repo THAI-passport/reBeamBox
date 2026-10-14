@@ -9,3 +9,6 @@ analysis/jadx.done
 *.egg-info/
 reports/*
 !reports/README.md
+analysis/BUILD-INFO.txt
+testmedia/
+dumps/

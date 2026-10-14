@@ -28,8 +28,30 @@ def crc16_xmodem(data, crc=0):
     return crc
 
 
+# Jieli OTA runs over this same 0xAE00 RCSP link: the official OTA SDK docs describe
+# device-pulled firmware blocks with opcode 0xE5 [W]. The whole 0xE0-0xEF range is
+# refused until the app's OTA command table has been read [I]. Never relax this.
+OTA_OPCODES = frozenset(range(0xE0, 0xF0))
+
+
+def is_ota_frame(data):
+    """True if data starts an RCSP frame (or its first MTU chunk) carrying an OTA opcode."""
+    data = bytes(data)
+    if len(data) < 5 or data[:3] != HEAD:
+        return False
+    if data[4] in OTA_OPCODES:
+        return True
+    # opcode 0x01 wraps an inner opcode after sn (command) or status+sn (response)
+    if data[4] == OP_DATA:
+        inner = 8 if data[3] & 0x80 else 9
+        return len(data) > inner and data[inner] in OTA_OPCODES
+    return False
+
+
 def pack(opcode, payload=b"", *, command=True, want_response=False, sn=0, status=0, xm_opcode=None):
-    """Build one RCSP frame. For opcode 0x01 (data) xm_opcode is the inner opcode."""
+    """Build one RCSP frame. For opcode 0x01 (data) xm_opcode is the inner opcode. Refuses OTA opcodes."""
+    if opcode in OTA_OPCODES or (opcode == OP_DATA and xm_opcode in OTA_OPCODES):
+        raise ValueError("refusing to build RCSP OTA opcode 0x%02X (firmware writes are never sent)" % (xm_opcode if opcode == OP_DATA else opcode))
     flag = (0x80 if command else 0) | (0x40 if want_response else 0)
     body = bytes([sn]) if command else bytes([status, sn])
     if opcode == OP_DATA:

@@ -335,7 +335,7 @@ Entry format: date, phase, problem, cause, solution (or Status: Unsolved plus wh
 - Phase: CI
 - Problem: `git push` was refused: an OAuth App cannot create or update `.github/workflows/ci.yml` without the `workflow` scope.
 - Cause: The stored GitHub credential has no `workflow` scope.
-- Solution: Not worked around (no token handling). The unpushed local commits were rewritten so the workflow sits at `ci/ci.yml`, everything else was pushed. Status: Unsolved for activation; the owner must either grant the `workflow` scope (`gh auth refresh -s workflow`) and `git mv ci/ci.yml .github/workflows/ci.yml`, or add the file in the GitHub web UI.
+- Solution: Not worked around (no token handling). The unpushed local commits were rewritten so the workflow sits at `ci/ci.yml`, everything else was pushed. Status: Solved 2026-10-12: the token was given the `workflow` scope and the file was moved with `git mv ci/ci.yml .github/workflows/ci.yml`.
 
 
 ## 48. jadx type inference failure on the animation builder, three recovery attempts
@@ -404,3 +404,145 @@ Entry format: date, phase, problem, cause, solution (or Status: Unsolved plus wh
 - Problem: `.[dev]` pulled unicorn, capstone and pyelftools, which need wheels or a compiler and are used by only one test file and the RE tools; setup-tools.sh installed pytest without the package metadata.
 - Cause: all extras were lumped together.
 - Solution: extras split into test, emulation, full, with dev as an alias of test; setup script gained `--full`/`--emulation` and tolerates a failed emulation install; CI installs `.[test]`; `pytest-asyncio` was dropped because no test uses it. Verified in fresh venvs: core+test 303 passed, 2 skipped; full 304 passed, 1 skipped.
+
+## 57. Docs drift: hard-coded test counts and conflicting screen and size values
+- Date: 2026-10-12
+- Phase: docs
+- Problem: README, HANDOFF, SOP and the test plan carried test counts (148, 202, 250, 303, 304) that no longer matched, and screen size, picture size and video cap were restated in several files with different values.
+- Cause: Each milestone appended a new number or value instead of replacing the old one.
+- Solution: Counts removed (run `pytest -q` or read the Actions result). New `docs/FACTS.md` is the single source for screens, 360 versus 368, transports, chip, limits and safety defaults; README, models.md, pulse.md and HANDOFF link to it. Status: Solved.
+
+## 58. --model overrode the picture size the badge reports
+- Date: 2026-10-12
+- Phase: client
+- Problem: `--model nikko` set `--size` to 368, which then won over the size reported by the badge (for example 360), contradicting the README and the intended rule.
+- Cause: `apply_model` copied the profile size into `args.size`, which the client treats as an explicit override. Found while checking docs for contradictions.
+- Solution: `apply_model` leaves `args.size` alone; the client falls back to 368 only when the badge reports nothing. Test added in `tests/test_models.py`. Status: Solved.
+
+## 59. Daily write cap
+- Date: 2026-10-12
+- Phase: safe-write
+- Problem: Safe-write only warned about high daily counts, so a loop could still wear out flash.
+- Cause: Policy was warnings plus a minimum interval only.
+- Solution: Hard cap of 50 writes per badge per rolling 24 hours (`--max-per-day`, 0 disables, `--force` overrides), `CapReached` is a `Blocked` subclass so the CLI exits 2. The default warning threshold moved from 100 to 40 so the warning comes before the cap. Status: Solved.
+
+## 60. Agent rules lived only in prose and a mislabelled review file
+- Date: 2026-10-12
+- Phase: documentation
+- Problem: No AGENTS.md or fixes list existed, so agent rules (safe-write, no vendor artifacts, log upkeep) lived only in the SOP and README. A README test count had drifted again, and the critique of an external review sat in a file named `haiku5.5-is-garbage.md`.
+- Cause: Rules were written as procedure, not as instructions an agent loads at session start.
+- Solution: Added AGENTS.md, CLAUDE.md and fixes.md; removed the README test count; renamed the critique to `docs/review-critique-2026-10.md`; added a tag-mapping note to PROTOCOL.md. Status: Solved. Hardware testing is still open (see fixes.md).
+
+## 61. Analysis files were not rebuildable by script
+- Date: 2026-10-12
+- Phase: reproducibility
+- Problem: AGENTS.md required that analysis/ be rebuildable, but only prose steps existed, and setup-tools.sh fetched unpinned latest versions.
+- Cause: The download, hash check, extraction and jadx run were done by hand once.
+- Solution: Added `scripts/rebuild-analysis.sh` driven by `analysis/sources.env`; it refuses on a hash mismatch (`--accept-new-hash` prints the hash and edits nothing), is idempotent and has `--dry-run`, `--force`, `--recover`, `--local-file`. jadx and apktool are pinned. Status: Solved for the local path; the network download is untested in the suite.
+
+## 62. A long jadx run was killed by the tool shell timeout
+- Date: 2026-10-12
+- Phase: reproducibility
+- Problem: Running the rebuild script in the foreground got "Killed" (exit 137) after about 60 s and the script recorded a failed jadx run.
+- Cause: Memory pressure on the shared box: jadx stalled at 75 percent and the process was killed (reproduced three times, also when detached). A run with `JAVA_OPTS=-Xmx3g` finished in about 45 s.
+- Solution: Cap the heap with `JAVA_OPTS=-Xmx3g` when memory is tight and run detached (`setsid nohup ... &`). The script never treats a killed jadx as success (exit 137 is reported and the marker is not accepted). Status: Solved.
+
+## 63. Version query failed silently under set -e
+- Date: 2026-10-12
+- Phase: reproducibility
+- Problem: With a broken jadx on PATH the script exited 1 with no message.
+- Cause: A failing command inside `$(... | head -1)` with pipefail ended the script before the pin check.
+- Solution: Version lookups end with `|| true`, so the pin check reports the mismatch with exit 4. Status: Solved.
+
+## 64. Rebuild and setup scripts were bash-only
+- Date: 2026-10-12
+- Phase: tooling
+- Problem: `rebuild-analysis.sh` used `sha256sum` and `declare -A`; `setup-tools.sh` fetched linux/x64 only and edited only `~/.bashrc`. On macOS (bash 3.2, no `sha256sum`) and Windows they did not run, although AGENTS.md listed macOS as supported.
+- Cause: bash chosen for convenience; GNU userland assumed.
+- Solution: reimplemented both in Python 3 standard library (`scripts/rebuild_analysis.py`, `scripts/setup_tools.py`); the `.sh` files are wrappers. The 18 existing tests passed unchanged against the port before new ones were added (heap option, `--url`, setup URLs and the macOS JDK bundle layout). Also added `--max-heap` (default 3g under 8 GiB RAM) and `--url`. Status: Solved for Linux (tested here); macOS and Windows are covered by CI and unit tests only.
+
+## 65. Cloud session cannot reach the download hosts
+- Date: 2026-10-12
+- Phase: tooling
+- Problem: from a cloud container, `d.apkpure.com` and `api.adoptium.net` are unreachable and github release URLs return 403, so a rebuild stops at the download.
+- Cause: the environment network policy allows package managers and a short list of hosts.
+- Solution: add the hosts under Allowed domains in the environment settings, or pass `--local-file`. Status: needs the user.
+
+## 66. Recon checklists could not be executed by a newcomer
+- Date: 2026-10-12
+- Phase: documentation and tooling
+- Problem: `hardware-recon-checklist.md` mixed procedures, background and an external review; steps contradicted the tool behaviour (the H8 identical rewrite is skipped by the delta guard, the 30 s interval and 50 per day cap were not budgeted), the free space number was not printed anywhere, test media and a passive notification logger did not exist, the FCC ID spelling was wrong in one place, and nothing said who may do which step (a cloud sandbox has no Bluetooth).
+- Cause: the checklist was written before the safe-write policy and the first-contact tooling.
+- Solution: new task pack `docs/tasks/` with per-task executor, write cost, exact commands, interpretation tables, stop conditions and an assumption policy; `tools/make_test_media.py`, `tools/notify_log.py`; the nn20 session now logs every status JSON (`badge status:` line, `Nn20Session.status_log`). Status: Solved in documentation; untested by a second agent and by hardware.
+
+## 67. Hash mismatch after a vendor release gave no clue why
+- Date: 2026-10-12
+- Phase: tooling
+- Problem: `analysis/sources.env` pins the XAPK hash but downloads from a `?version=latest` link. After a new release the rebuild stops with only two hashes, and a newcomer cannot tell a corrupt download from a new version. A second known-good source could not be configured.
+- Cause: one URL, no version information in the error.
+- Solution: `scripts/rebuild_analysis.py` now prints the version the downloaded XAPK reports (manifest.json) against the pinned version, and tries `URL`, `URL2`, `URL3`, `URL4` in order until one matches the pinned hash. Tests in `tests/test_rebuild_analysis.py`. Status: Solved. Open: nobody has recorded a versioned mirror yet, so `URL2` is empty (see fixes.md).
+
+## 68. Task pack mentioned flags that might not exist
+- Date: 2026-10-12
+- Phase: documentation
+- Problem: a step-by-step pack is only as good as its commands; a renamed flag would silently break a hardware session.
+- Cause: documentation and CLI evolve separately.
+- Solution: `tests/test_task_pack_commands.py` checks every `rebeambox` subcommand and flag and every `python tools/...` / `scripts/...` path mentioned in `docs/tasks/`. It was checked by injecting a bogus flag (the test failed as expected). Also added `docs/tasks/QUICKSTART.md` because the full pack is long and weaker agents skim. Status: Solved.
+
+## 69. A rebuild on a new instance repeated work the docs already held
+- Date: 2026-10-12
+- Phase: process
+- Problem: a fresh agent's default is to rebuild and decompile, which costs a 72 MB download and a jadx run and often answers nothing new; and findings from a pass were not always written back, so the next pass repeated it.
+- Cause: no rule said when to rebuild, and no rule said what to record afterwards.
+- Solution: AGENTS.md "Rebuild only when necessary" (grep the docs, check for an existing tree, rebuild only for `[I]`/`[U]` claims, new versions or contradictions, `--dry-run` first, state the reason) and "After every decompile pass" (PROTOCOL, FACTS, SOP, problem log in the same commit); SOP 9.2. Status: Solved as process; relies on agents following it.
+
+## 71. External reference documents disagree with the repo
+- Date: 2026-10-12
+- Phase: documentation
+- Problem: an imported Beambox summary states several values with `[C]` that the repo holds as `[W]`/`[I]` or as different numbers (BLE minimum delay, battery size, panel size, what a non-persistent picture proves).
+- Cause: external authors blend confirmed and reported facts under one tag scheme.
+- Solution: the document is stored as `docs/beambox-reverse-reference.md` with a reconciliation table at the top; PROTOCOL.md and FACTS.md win; each row is closed when the decompiled code or a hardware result settles it. Also added `docs/tasks/NEXT-PASS-PROMPT.md` for the next agent pass. Status: Open until the rows are closed (see fixes.md).
+
+## 70. Hash pinned, but only by a floating latest link
+- Date: 2026-10-12
+- Phase: reproducibility
+- Problem: the only URL for the app is a floating "latest" link, so a vendor update changes the file while the pinned hash stays; a rebuild then fails, and `--accept-new-hash` could be used to move on without a record.
+- Cause: the pin was a hash plus a floating URL; no rule asked for a versioned URL, an owner-controlled copy or a new entry per release.
+- Solution: AGENTS.md pinning rule, `COPY_LOCATION` in sources.env, warnings from the rebuild script when all URLs float or the copy location is missing, clearer mismatch and accept messages, SOP 9.3, tests. The APKPure link is still floating; no versioned or mirrored URL is known yet, so the owner-controlled copy is the real pin. Status: Mitigated.
+
+## 72. Simulator numbers looked like badge facts
+- Date: 2026-10-12. Found during S8.
+- Evidence: `rebeambox/sim.py` used bare literals for free space (20000 KB, 32000 KB total, 12000 KB over Wi-Fi). A reader could take them for measured values.
+- Cause: the simulator was written before the assumption register existed.
+- Solution: named constants with an assumption comment pointing at `docs/tasks/results/S8-2026-10-12.md`; no behaviour change, suite unchanged. The reference document's disputes moved to FACTS.md section 9. Status: Solved.
+
+## 73. Documented guard time used the wrong multiplier
+- Date: 2026-10-12. Found during S2.
+- Evidence: PROTOCOL 2.6 and the client had `min(ceil(N/1000) * 800 + 800, 3000)` ms. The app's smali multiplies by 0x12c (300). The decompiled Java showed a library constant with the value 300 in that place, so the earlier reading took it for something else.
+- Cause: a jadx constant substitution plus a doc line tagged [C] without a second look at the bytecode.
+- Solution: `nn20.guard_time_ms` now uses 300 (test updated and extended), PROTOCOL, FACTS section 10, HANDOFF corrected, SOP 12.4 added. Effect: the client waits 500 ms less for small uploads. Status: Solved; the badge's own need for a guard is still [U] (HW-9).
+
+## 74. Free-space margin and ACK retry count did not match the app
+- Date: 2026-10-12. Found during S2.
+- Evidence: the app refuses an upload when payload + 0x100000 (1 MiB) exceeds free space; the client and docs said 64 KiB. In ACK mode the app counts failures and aborts on the third, so only two retries happen (waits 500 and 1000 ms); docs and client allowed three retries with a 2000 ms wait.
+- Cause: another substituted constant (the margin) and an off-by-one in reading increment-then-compare.
+- Solution: `FREE_SPACE_MARGIN` and `ACK_ABORT_FAILURES` in `rebeambox/session.py`, two new tests, docs corrected (PROTOCOL, FACTS, HANDOFF, hardware-prediction). Status: Solved. The margin is a client safety choice that happens to match the app.
+
+## 75. Watch device tag was wrong in the scan table
+- Date: 2026-10-12. Found during S6.
+- Evidence: the SDK's device-type enum has WATCH = 0xB9 (smali), the client and PROTOCOL 3.1 had 0xB5. The enum also lists phone case 0xB0, alarm clock 0xB1, speaker 0xB2, badge 0xB3.
+- Cause: a transcription slip from an earlier pass, never cross-checked.
+- Solution: `scan.DEVICE_TAGS` and PROTOCOL fixed, test pinning the table added. No effect on badge discovery (only 0xB3 is accepted). Status: Solved.
+
+## 76. FACTS routing row contradicted PROTOCOL
+- Date: 2026-10-12. Found during S6.
+- Evidence: FACTS section 3 said the BadgeSdk path is chosen by the server product record; the app's code chooses it by the advertised name (NEO or B-Device after normalising), anything else goes to nn20 (PROTOCOL 1.1, re-read in S6).
+- Cause: the FACTS row was written from the product-list analysis, not from the connect handler.
+- Solution: row corrected and tagged with S6. Status: Solved.
+
+## 77. OTA reachable through RCSP; damaged ledger reset the write cap
+- Date: 2026-10-14. Found while porting lessons from reWatch.
+- Evidence: Jieli's OTA SDK docs place firmware upgrade on 0xAE00 itself (device-pulled blocks, opcode 0xE5) [W]; `rcsp.pack` accepted any opcode. `safewrite.Store._load` renamed an unreadable `uploads.json` to `.bad` and returned a zero count, so the next write passed the daily cap.
+- Cause: OTA was thought of as a separate service; the ledger chose availability over safety.
+- Solution: opcode block 0xE0-0xEF in `rcsp.pack` and in BleakLink/RecordingLink (PROTOCOL 3.7.3); the ledger refuses writes, even with `--force`, until `rebeambox uploads --reset`. Tests added; the old test that pinned the reset behaviour now pins the new rule. Status: Solved in code; untested on hardware (no OTA frame is ever sent, so nothing to test there).
+

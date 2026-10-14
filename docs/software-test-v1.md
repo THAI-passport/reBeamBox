@@ -72,7 +72,7 @@ Skips by design: native auth fuzz (needs unicorn, pyelftools and the library und
 - Location: `tests/test_sw_containers.py`: `test_property_control_frames_round_trip_any_chunking`, `test_property_control_stream_of_many_frames`, `test_property_nn20_frames_reassemble`, `test_property_nn20_reply_stream`, `test_property_rcsp_pack_unpack`.
 
 ## Counts
-59 test functions in 5 new files, about 83 test cases by default (parametrized) plus 1 slow test. Total with older files is higher.
+The plan is implemented in the `tests/test_sw_*.py` files; run `pytest -q` for the current number of cases (one auth fuzz test is behind the slow marker).
 
 ## Changes made to code for these tests
 - `WifiSession.stream` now drops frames above 30720 bytes (the original app only logs a warning) and counts them in `dropped`.

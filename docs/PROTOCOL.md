@@ -6,6 +6,8 @@ Method: static reading of the decompiled app (jadx) plus smali for methods jadx 
 - [I] Inferred (reasoned from code but not directly shown)
 - [S] Speculative
 
+Tag mapping to the repo-wide scheme (AGENTS.md, docs/FACTS.md): [C] = [C], [I] = [I], [S] = [U]. [W] third-party, [V] emulator-verified and [H] hardware-confirmed are also used where they apply.
+
 Worked-example bytes come from `scripts/spec_vectors.py`, which only implements the formulas below. No app source or assets are copied.
 
 ## 0. The app contains THREE transports, selected by device name
@@ -59,7 +61,7 @@ Total frame length L + 9. A frame plus its checksum sums to 0 mod 256. Single-pa
 - 6: still image upload (flag TRUE passed to the sender).
 - 5: animation upload (multi-image carousel, GIF, video-to-GIF), flag null.
 - 13: JSON settings command. The only one seen: `{"animation_type":<n>}`, sent as a bare single-packet frame (no envelope) before an animation upload.
-- 1, 2, 3, 4, 7 are defined but no caller was found in the analysed activities [I]; probably used by other screens or the badge firmware tooling.
+- 1, 2, 3, 4, 7 are defined but have no sender anywhere in the decompiled tree [C, S2 2026-10-12: every call to the data sender passes 5 or 6, the settings sender passes 13; names of primitive constants are inlined, so the check followed the senders]; [I] they belong to firmware tooling or other products.
 
 ### 2.4 Payload envelope and chunking [C]
 For types 5 and 6 the stream to chunk is the ASCII text `{"type":<type>,"data":` followed by the raw media container bytes followed by `}`. This single byte string is split into packets of `P` data bytes where `P = min(446, max(23, MTU) - 12)`. With MTU 512, P = 446 (frame 455 bytes, still within MTU 512 minus 3 ATT bytes); with MTU 23, P = 11. At most 65535 packets. Type 13 JSON is sent as the data directly, without the envelope, limited to 446 bytes.
@@ -81,11 +83,12 @@ JSON content: a status record (parsed only when L > 30) with keys `freespace` (K
 ### 2.6 Flow control and ACK [C]
 Two modes, chosen per upload:
 - time_mode 1 (reported by the badge, or the app's stored loop switch) selects protocol 2, "no-ACK": every packet written back to back with a 20 ms interval; each write is guarded by a 2 s timeout waiting for the GATT write callback; a `GetPacketFail` aborts; early `GetPacketSuccess` is tolerated.
-- Otherwise protocol 1, "ACK mode": batches of 4 packets (adaptive 4, 2, 1), inter-packet interval max(10 ms default, 50 ms floor set at start), one badge ACK expected per packet in the batch; the batch timer is interval x batch + 2.5 s. All ACKs success: advance and (after 20 or 50 good packets) step the batch size back up. Any `GetPacketFail`: retry from the failed packet with batch 1, waits 500 ms, 1000 ms, 2000 ms (cap 2000), at most 3 retries then fail. On a failed write the interval escalates 20, 40, 80 ms.
+- Otherwise protocol 1, "ACK mode": batches of 4 packets (adaptive 4, 2, 1), inter-packet interval max(10 ms default, 50 ms floor set at start), one badge ACK expected per packet in the batch; the batch timer is interval x batch + 2.5 s. All ACKs success: advance and (after 20 or 50 good packets) step the batch size back up. Any `GetPacketFail`: retry from the failed packet with batch 1, waits 500 ms then 1000 ms (formula `min(2000, 500 * 2^(n-1))`, the third failure of one upload aborts, so the 2000 ms wait is never used) [C, corrected in S2 2026-10-12; an earlier text said three retries]. On a failed write the interval escalates 20, 40, 80 ms.
 - Writes are WRITE_NO_RESPONSE in both modes, so the ACKs are application-level, not ATT.
-- [C] After the last packet of a type 5 or 6 transfer the app waits an extra guard time `min(((N + 999)/1000) * 800 + 800, 3000)` ms before reporting success, to let the badge finish.
+- [C] After the last packet of a type 5 or 6 transfer the app waits an extra guard time `min(ceil(N / 1000) * 300 + 800, 3000)` ms (N = number of packets; verified in smali, S2 2026-10-12; the jadx Java showed an unrelated library constant of the same value 300, and an earlier text of this file said 800 for the multiplier) before reporting success, to let the badge finish.
 - [C] Minimum gap between separate uploads: 300 ms. A second upload while busy is rejected.
-- [C] Free-space check before upload: the app refuses if `payload + 64 KiB > freespace KB * 1024` when `freespace` is known; if unknown it proceeds.
+- [V] Client behaviour (own code, not badge evidence): every status record that parses is logged as `badge status: size=... freespace=... KB allspace=... KB time_mode=...` and kept in `Nn20Session.status_log`; the free-space and rewrite test (docs/tasks/HW-RECON.md HW-7) reads these numbers, or re-reads them with `probe --qualify` after a reconnect. Whether the real badge pushes a fresh record after each upload is [U] until HW-7 runs.
+- [C] Free-space check before upload: the app refuses if `payload + 1 MiB > freespace KB * 1024` (1 MiB = 0x100000 in smali; an earlier text said 64 KiB, corrected in S2 2026-10-12) when `freespace` is known; if unknown it proceeds.
 - [I] Whether ACKs are mandatory for the badge to accept data: no code path sends data without the badge having an ACK option, but the "no-ACK" mode proves the badge tolerates a stream without per-batch ACK; the 20 ms spacing there is the safe minimum.
 
 ### 2.7 Media containers [C]
@@ -174,7 +177,7 @@ sequenceDiagram
     participant B as Badge (service 0x01F0)
     H->>B: subscribe notify 0x01F2
     B-->>H: A0 status JSON (freespace, size, time_mode) [C pushed, not requested]
-    Note over H: refuse if payload + 64 KiB exceeds freespace [C]
+    Note over H: refuse if payload + 1 MiB exceeds freespace [C]
     opt animation only
         H->>B: write 0x01F1 type 13 {"animation_type":n}
         Note over H: wait 200 ms [C]
@@ -203,10 +206,10 @@ sequenceDiagram
         loop ACK batches from packet 0 (batch 1 after an error)
             H->>B: frame i (first frame has remaining = n - 1: new upload [I])
             B-->>H: GetPacketSuccess or GetPacketFail
-            Note over H: on Fail or timeout retry after 0.5, 1, 2 s, give up after 3 retries [C app, same in client]
+            Note over H: on Fail or timeout retry after 0.5, 1, 2 s, give up on the third failure (two retries) [C app, same in client]
         end
     end
-    Note over H: wait guard min(((n+999)//1000)*800+800, 3000) ms, no finish command [C]
+    Note over H: wait guard min(ceil(n/1000)*300+800, 3000) ms, no finish command [C]
 ```
 
 ## 3. BadgeSdk path ("NEO" / "B-Device" names)
@@ -215,7 +218,7 @@ Three layers: advertising data, a custom control channel with its own frames, an
 
 ### 3.1 Advertising [C]
 Scan unfiltered. Parse the AD structure with type 0xFF (manufacturer specific) from the raw scan record; the payload must be at least 10 bytes:
-- byte 0: device type tag (0xB5 watch, 0xB0 phone case, 0xB1 alarm clock, 0xB2 speaker, **0xB3 baji badge**). Only 0xB3 is accepted by the SDK scanner.
+- byte 0: device type tag (0xB9 watch [C: SDK enum, confirmed in smali, S6 2026-10-12; an earlier text said 0xB5], 0xB0 phone case, 0xB1 alarm clock, 0xB2 speaker, **0xB3 baji badge**). Only 0xB3 is accepted by the SDK scanner.
 - byte 1: shape tag (0x6C square, **0x6D circle**).
 - bytes 2..7: six-byte MAC-like identifier (printed as AA:BB:..).
 - bytes 8..9: project number, little endian.
@@ -223,7 +226,7 @@ The 16-bit "prefix" is (type << 8) | shape.
 
 ### 3.2 Control service [C]
 - Service `C2E6FD00-E966-1000-8000-BEF9C223DF6A`. Characteristics: `...FD01` (notify), `...FD02` (command write), `...FD03` (notify; also an alternate write target).
-- A second pair, service 0x3802 with characteristic 0x4A02, is subscribed and used by a payment certificate component ("PayCertificationApi"); not needed for images [I].
+- A second pair, service 0x3802 with characteristic 0x4A02, is subscribed and used by a payment certificate component ("PayCertificationApi"); not needed for images [C for the subscription and the forwarding, S2 2026-10-12].
 - On discovery the app enables notifications (writes the CCCD with ENABLE_INDICATION, 0x0002) on FD01, FD03 and 4A02 one by one (serialised queue), then requests MTU 512. Write chunk size = MTU - 6 bytes; the next chunk is written 5 ms after the previous write completes. Writes use the default write type (with response) and are serialised through a queue: next command only after the write callback.
 - After the connection is up the app waits 1550 ms and then sends the bind command.
 
@@ -360,6 +363,9 @@ Note the same E1/E21/SAFER+ family also appears in `function_E21` (E21(rand, add
 
 ### 3.7.2 Other RCSP commands in the Jieli SDK (storage management) [C ids, U payloads]
 The bundled Jieli SDK defines RCSP commands that could matter for storage management and flash wear: START_FILE_BROWSE 12 and STOP_FILE_BROWSE 13 (list files per storage), FILE_BROWSE_DELETE 31 and DELETE_FILE_BY_NAME 35 (delete), FORMAT_DEVICE 34, READ_FILE_FROM_DEVICE 36 (download a file from the badge), SMALL_FILE_TRANSFER 40, SEARCH_DEVICE 25, GET_DEV_MD5 212, REBOOT_DEVICE 231, NOTIFY_FILE_STRUCTURE_CHANGE 242. The BadgeSdk wrapper `JieLiFileOperate` (package com.zijun.badgesdk.internal.transfer) exposes list, delete and read through `FileBrowseManager` and sends files with `TransferTask`; `BadgeFileTransfer` only calls the send path (`startSendFile1`: prefer the online storage named "SD Card 1", else the first online USB or SD card, which is what `rcsp.pick_storage` does) [C]. No Beambox UI code calls delete, browse or format on the badge [C: no callers outside the SDK]. [U] whether the badge firmware implements them and their payload layouts (not analysed); a delete command would let the client reclaim flash space, to be examined from a capture or hardware. Native pass: docs/binaries.md.
+
+### 3.7.3 OTA opcodes are refused [W, I]
+Jieli's official OTA SDK documentation puts firmware upgrade on this same 0xAE00 RCSP link, with the device pulling blocks through opcode 0xE5 (seek and length) [W: doc.zh-jieli.com, jl_ota_sdk_qa]. A service-UUID blocklist would therefore not stop it. `rcsp.pack` refuses every opcode 0xE0-0xEF (also as the inner opcode of 0x01), and both links refuse any frame or first MTU chunk that carries one (`rcsp.is_ota_frame`); the range is wider than 0xE5 until the app's OTA command table is read [I]. It also covers REBOOT_DEVICE 231 (0xE7), which the client never sends. Tests: `tests/test_ota_block.py`.
 
 ### 3.8 Full upload sequence, BadgeSdk
 1. Scan unfiltered; accept AD type 0xFF with byte0 = 0xB3; shape 0x6D = circle. (Name test NEO / B-Device as in 6.1.)
@@ -522,6 +528,8 @@ Wi-Fi path: single control words only (0x007A shutter, 0x007B camera on, 0x007F 
 
 Consequences for the client: (1) the Niji touch display is used locally by the badge firmware; no touch stream is exposed to the app, so a remote-control or drawing-from-touch feature cannot be built from the documented protocol. [I] The badge may still send undocumented notifications; capture with nRF Connect while touching the screen (first-session checklist). (2) Battery level is available only on the BadgeSdk path (0x29 then 0x27); no battery on nn20 or Wi-Fi in the app. (3) The shutter event is the only button event: BadgeSdk 0x81 value 1 or 3, Wi-Fi 0x007A. (4) The scrolling-text screen ("danmaku") on BLE products renders text locally into an animation (duration chosen 1 s and up) and uploads it as a normal animation, [I] there is no separate text protocol.
 
+
+Additions from S5 (2026-10-12, docs/tasks/results/S5-2026-10-12.md) [C]: (a) the status record model has getters only for `freespace` and `time_mode`; `size`, `allspace`, `devname`, `brand`, `type` are parsed and then never read, so the app does not take the picture size from the nn20 status. (b) Two more notification paths exist and are not picture related: the payment certificate characteristic (0x4A02) and an Espressif BluFi (Wi-Fi provisioning over BLE) client used from the pets device screen [I for its use]. (c) The BadgeSdk 0xFF ack carries one status byte and 0x81 arrives as an integer. (d) Negative result unchanged: no code path parses touch coordinates; searched the nn20 manager, bleutils and network packages, the whole badge SDK, and the Wi-Fi reader words. [U] what the badge sends that the app ignores: HW-13.
 
 Synthetic capture fixtures of these flows (fragmented nn20 animation with ACKs, full RCSP auth, a malformed trace) are in `fixtures/captures/`; decode them with `tools/replay_pcap.py`. They are generated, not recorded.
 

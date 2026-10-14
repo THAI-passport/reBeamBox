@@ -69,6 +69,7 @@ rebeambox probe --qualify --model nikko          # scan, MTU, GATT, transport, r
 rebeambox probe --qualify --simulate nn20        # same against a software badge (no Bluetooth)
 rebeambox send-image photo.jpg --packet-interval-ms 20 --ack-batch-size 4 --nn20-still gif
 python tools/replay_pcap.py btsnoop_hci.log --out extracted/     # decode a capture of the vendor app (also .pcap, .pcapng)
+python tools/scrub_capture.py summary.txt -o scrubbed.txt --mask <serial>   # mask addresses, tokens and named literals before committing
 cd ui && python3 -m http.server 8000                             # Web Bluetooth harness, open http://localhost:8000 in Chrome
 ```
 - `probe --qualify` writes nothing to the badge storage: nn20 badges are only listened to (status JSON on 0x01F2), BadgeSdk badges get the read-only info query 0xC6. The report follows the results template of docs/hardware-test-v1.md; Bluetooth addresses are masked unless `--no-redact`. Reports are git-ignored.

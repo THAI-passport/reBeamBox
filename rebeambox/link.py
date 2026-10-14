@@ -8,6 +8,13 @@ def short(uuid):
     return m.group(1) if m else u
 
 
+def _refuse_ota(data):
+    """Last line of defence: no link sends a Jieli RCSP OTA frame, however it was built."""
+    from .rcsp import is_ota_frame
+    if is_ota_frame(data):
+        raise PermissionError("refusing to send an RCSP OTA frame (opcode in 0xE0-0xEF)")
+
+
 class Link:
     mtu = 23
 
@@ -78,6 +85,7 @@ class BleakLink(Link):
         return bytes(await self._client.read_gatt_char(uuid))
 
     async def write(self, uuid, data, response=False):
+        _refuse_ota(data)
         await self._client.write_gatt_char(uuid, data, response=response)
 
     async def subscribe(self, uuid, callback):
@@ -106,6 +114,7 @@ class RecordingLink(Link):
         return [u for u in (control.SERVICE, AE00, nn20.SERVICE) if self.badge.has_service(u)]
 
     async def write(self, uuid, data, response=False):
+        _refuse_ota(data)
         self.events.append(("W", short(uuid), bytes(data)))
         self.badge.on_write(uuid.lower(), bytes(data))
 

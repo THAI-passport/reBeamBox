@@ -22,7 +22,7 @@ Instructions for AI agents working in this repository (reBeamBox: an open Python
 ## Safety with real badges
 - Contact with a real badge needs the user's go-ahead for each session. Start read-only: `rebeambox probe --qualify`. Writes come one at a time after that.
 - Every real upload goes through the safe-write guard (counter, delta skip, minimum interval, hard daily cap of 50 per badge). Never bypass it in code or in a test run against hardware, and do not raise the cap without an explicit instruction and a flash-wear reason.
-- Never add firmware-flashing or OTA paths.
+- Never add firmware-flashing or OTA paths. RCSP opcodes 0xE0-0xEF are refused by `rcsp.pack` and by every link (PROTOCOL 3.7.3); do not relax that.
 - If the badge answers unexpectedly, stop and record it; do not retry in a loop.
 
 ## Platform support
@@ -55,3 +55,7 @@ Instructions for AI agents working in this repository (reBeamBox: an open Python
 - Docs that describe behaviour change in the same commit as the code.
 - Stop and ask when a step needs the user: providing hardware, approving a real write, installs needing root, or any decision about the legal notes.
 - Never commit personal data: Bluetooth addresses (mask them), serial numbers, account ids, home Wi-Fi names. `reports/` is git-ignored for that reason.
+
+## Skills and generic tooling
+The reverse-engineering skills (`re-workflow`, `re-jieli`, `re-capture-ingestion`, `re-client-sim`, `re-hardware-recon` and others) live in the reWork repo, kept generic there, and are not copied here so they cannot drift. When a pass here teaches something reusable, record it in `docs/SOP.md` and port it to reWork. `tools/scrub_capture.py` (from reWork) masks addresses, tokens and named literals in capture summaries before anything is committed.
+

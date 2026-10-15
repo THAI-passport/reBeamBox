@@ -63,3 +63,5 @@ Earlier day-to-day detail lives in those logs; new work appends here.
   - **Rationale:** without the status the client picks ACK mode on a no-ACK badge.
 - **Step:** P3/P4: type 5 and type 6 stills both stored (free space drops 16 KB each) but the Pulse keeps showing its logo. Badge Bluetooth turns off after each upload; owner re-enables it. Stopped writing at 2 of 18.
   - **Rationale:** a third format test would not separate "not stored" from "not displayed"; the free-space numbers already show storage works. The missing piece is what the vendor app sends, so the vendor capture is the next step.
+- **Step:** P2 vendor capture pulled via `adb bugreport`, decoded with `tools/replay_pcap.py` and a short btsnoop parse (problem 87). Added a log line for `GetPacketSuccess`.
+  - **Rationale:** compare app and client byte for byte before spending more writes; the only difference found is the frame count.

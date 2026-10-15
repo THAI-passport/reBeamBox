@@ -576,3 +576,9 @@ Entry format: date, phase, problem, cause, solution (or Status: Unsolved plus wh
 - Evidence: `rebeambox scan --all --timeout 10` exits 134 (SIGABRT) with no output when launched by the Claude desktop app's shell, with or without its sandbox. The same command worked from the IDE terminal used for P1.
 - Cause: [I] macOS privacy (TCC) kills a process that touches CoreBluetooth when the responsible app has no Bluetooth permission.
 - Solution: grant Bluetooth to the Claude app (System Settings, Privacy and Security, Bluetooth) and restart it, or run the live commands from a terminal that already has the permission. Status: Open until the owner chooses.
+
+## 83. First write failed: "badge did not acknowledge packet 0"
+- Date: 2026-10-15. Phase: Live P3.
+- Evidence: `send-image --model nikko` on the Pulse printed no `badge status` line, chose ACK mode and aborted after about 10 s at packet 0. In P1 `probe --qualify` (which waits up to 3 s) received `time_mode: 1`. Upload counter stayed 0.
+- Cause: `Nn20Session.start` waited 50 ms after enabling notify; the badge pushes its status later, so `time_mode` was unknown and the client waited for ACKs a no-ACK badge never sends.
+- Solution: `STATUS_WAIT_S = 2.0` in `rebeambox/session.py`: wait up to 2 s for the status before sending, log when it does not come. Status: Fixed in code; hardware retry pending.

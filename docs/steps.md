@@ -57,3 +57,7 @@ Earlier day-to-day detail lives in those logs; new work appends here.
   - **Rationale:** AGENTS.md forbids identifiers in committed files; the handoff itself said to mask it.
 - **Step:** Read-only `scan --all --timeout 15` before P3: badge not advertising. P3 held until the owner wakes the badge and disconnects the phone app.
   - **Rationale:** Rule 8 (one central) and the handoff note that the badge sleeps when disconnected.
+- **Step:** Live commands run through Terminal.app (`osascript`), because macOS kills CoreBluetooth use whose responsible process is the `claude` CLI (problem 82).
+  - **Rationale:** the CLI has no Info.plist, so it can never be granted Bluetooth; Terminal already has the permission.
+- **Step:** P3 attempt 1 failed (problem 83); owner approved the status-wait fix; tests pass. Retry blocked: badge asleep.
+  - **Rationale:** without the status the client picks ACK mode on a no-ACK badge.

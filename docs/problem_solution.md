@@ -588,3 +588,9 @@ Entry format: date, phase, problem, cause, solution (or Status: Unsolved plus wh
 - Evidence: after the problem 83 fix, `send-image gradient_label.png --model nikko` (nn20, type 5 one-frame container, no-ACK, 368x368) finished in 3.65 s with exit 0 and counted 1 write. The owner reports the screen shows the Beambox logo, clean, not the test image. No `GetPacketSuccess`/`GetPacketFail` text was logged. The status in this session said `allspace=16384`, while the handoff recorded 32000.
 - Cause: unknown. Candidates [I]: the type 5 container is not what this firmware displays for stills (app code uses type 6 album); the badge stored it but needs a separate play or select step; the stream was dropped silently in no-ACK mode.
 - Solution: Status: Open. Next: one write with `--nn20-still album` (type 6). If that also shows the logo, stop writing and take a vendor app capture (P2) to compare.
+
+## 85. Pulse stops advertising after the first upload
+- Date: 2026-10-16. Phase: Live P4 (attempted).
+- Evidence: after the problem 84 upload, the badge is absent from `scan --all` (15, 20 and 60 s) and from direct connects (3 attempts), on the QR "scan to download" Bluetooth page and after a full power-cycle. No device in range advertises 0xAF30 or 0x01F0; the Mac shows no connection to it; the owner's phone Bluetooth is off and has never paired with it. Other devices nearby are seen, so the host scanner works.
+- Cause: unknown. Candidates [I]: the firmware is stuck processing the upload (would match "logo shown, no change"); it stopped advertising after binding to this Mac; it advertises only on a menu entry not yet tried.
+- Solution: Status: Open. No further writes until it advertises again.

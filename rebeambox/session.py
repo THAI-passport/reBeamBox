@@ -6,7 +6,8 @@ import time
 from . import control, jl_auth, nn20, rcsp
 
 FREE_SPACE_MARGIN = 1024 * 1024    # [C] the app refuses when payload + 1 MiB (0x100000 in smali) exceeds the reported free KB * 1024
-ACK_ABORT_FAILURES = 3             # [C] the app gives up on the third failure of one upload (two retries, waits 500 and 1000 ms)
+STATUS_WAIT_S = 2.0                # [H] the Pulse pushes its status JSON shortly after notify is enabled; its time_mode picks no-ACK vs ACK
+ACK_ABORT_FAILURES = 3            # [C] the app gives up on the third failure of one upload (two retries, waits 500 and 1000 ms)
 AE00 = "0000ae00-0000-1000-8000-00805f9b34fb"
 AE01 = "0000ae01-0000-1000-8000-00805f9b34fb"
 AE02 = "0000ae02-0000-1000-8000-00805f9b34fb"
@@ -314,6 +315,11 @@ class Nn20Session:
     async def start(self):
         await self.link.subscribe(nn20.NOTIFY, self._on_notify)
         await asyncio.sleep(0.05)
+        end = asyncio.get_running_loop().time() + STATUS_WAIT_S
+        while not self.status and asyncio.get_running_loop().time() < end:
+            await asyncio.sleep(0.05)
+        if not self.status:
+            self.log("no status JSON within %.1f s: time_mode unknown, using ACK mode" % STATUS_WAIT_S)
         self.log("MTU %d, %d data bytes per packet" % (self.link.mtu, nn20.data_per_packet(self.link.mtu)))
 
     async def _wr(self, f):

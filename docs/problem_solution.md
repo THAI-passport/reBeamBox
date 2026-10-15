@@ -594,3 +594,9 @@ Entry format: date, phase, problem, cause, solution (or Status: Unsolved plus wh
 - Evidence: after the problem 84 upload, the badge is absent from `scan --all` (15, 20 and 60 s) and from direct connects (3 attempts), on the QR "scan to download" Bluetooth page and after a full power-cycle. No device in range advertises 0xAF30 or 0x01F0; the Mac shows no connection to it; the owner's phone Bluetooth is off and has never paired with it. Other devices nearby are seen, so the host scanner works.
 - Cause: unknown. Candidates [I]: the firmware is stuck processing the upload (would match "logo shown, no change"); it stopped advertising after binding to this Mac; it advertises only on a menu entry not yet tried.
 - Solution: Status: Open. No further writes until it advertises again.
+
+## 86. Type 6 album still is also stored but not shown
+- Date: 2026-10-16. Phase: Live P4.
+- Evidence: `send-image --nn20-still album` (write 2) finished in 3.64 s, exit 0; the owner reports the logo is still shown. Free space read from the pushed status: 13876 KB before write 1, 13860 KB before write 2, 13844 KB after (read-only `probe --qualify`). So each upload of about 13 KB is stored (16 KB step), for both type 5 and type 6. Problem 85 resolved by the owner: the badge's Bluetooth turns off after an upload and the owner turns it back on from the badge.
+- Cause: unknown [I]: the firmware stores uploads but needs a separate select or play step the client does not send, or shows them only from its own gallery menu. Contradicts the [W] report in PROTOCOL.md (type 5 displays at once), which may be another model or firmware.
+- Solution: Status: Open. Writes paused at 2 of 18. Next, no-write first: owner checks the badge menus for a gallery of uploads; then a vendor app reference capture (P2) to see what the app sends around the upload.

@@ -15,7 +15,7 @@ We have successfully completed **Batch A: Phase 0 (Preflight)** and **Phase 1 (R
 
 ### Confirmed Hardware Ground Truth `[H]`
 - **Target Device:** `beambox e-Badge Pulse` (identified on box as Pulse / NIKKO profile).
-- **Host Address (macOS CoreBluetooth UUID):** `3F81ED53-xxxx` (always mask as `3F81ED53-xxxx` in public reports).
+- **Host Address (macOS CoreBluetooth UUID):** `3F81ED53-xxxx` (full value only in the local shell variable `BADGE`, never in a committed file).
 - **Advertised Service:** `0000af30-0000-1000-8000-00805f9b34fb`.
 - **GATT Transport:** **`nn20`** (Service `000001f0-0000-1000-8000-00805f9b34fb`).
   - Write Characteristic (`0x01F1`): Handle 65 (`write-without-response`).
@@ -82,7 +82,7 @@ source .venv/bin/activate
    - When running CLI commands, pass `--timeout 15` so the BLE scanner has adequate time to catch an advertisement packet.
 3. **Beware False Targets:**
    - In earlier scans, a smartwatch replica named `Watch Ultra` (`5301DFC1-xxxx`, Bluetrum AB56xx running HryFine protocol) was active nearby.
-   - Always target the specific UUID: `3F81ED53-xxxx`.
+   - Always target the specific UUID via `--address "$BADGE"` (set it locally from `live/p1/probe-pulse.txt`).
 
 ---
 
@@ -110,7 +110,7 @@ If skipping Phase 2, begin **Phase 3 (First Write: One Still)**:
   # Start packet logging if desired, then send first test image:
   time .venv/bin/rebeambox send-image live/media/gradient_label.png \
       --model nikko \
-      --address 3F81ED53-xxxx \
+      --address "$BADGE" \
       2>&1 | tee live/p3/send-image.txt
   ```
 - **Owner Screen Confirmation Gate (Rule 6):**

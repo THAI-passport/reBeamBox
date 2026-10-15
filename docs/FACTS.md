@@ -26,7 +26,7 @@ Resolution advertised for the whole family: 360x360 [W]. Nothing in the app stat
 | nn20 status JSON `size` field, from a Niji | "368,368" | [W] |
 | Wi-Fi camera mode | 360x360 JPEG, quality 10, at most 30720 bytes | [C] |
 | BadgeSdk path | the badge reports its size (0xC7, 0xDB); the app uses it | [C] |
-| Real accepted size on a Nikko | unknown | [U] (hardware test H2) |
+| Real accepted size on a Nikko (Pulse) | reported as "368,368" in status JSON | [H] (live/p1/first-contact-20261015-002059.md) |
 
 Client rule: use the size the badge reports. Without a report, nn20 falls back to 368 and the BadgeSdk path to 360; the Wi-Fi path uses 360. `--size` overrides all of these. `--model` does not change the size.
 
@@ -36,7 +36,7 @@ Client rule: use the size the badge reports. Without a report, nn20 falls back t
 |---|---|---|
 | NIJI | nn20 BLE, service 0x01F0 only (write 0x01F1, notify 0x01F2); advertised name `E-badge` | [W] |
 | NANO | nn20 BLE, service 0x01F0 only | [W] |
-| NIKKO (Pulse) | nn20 BLE expected; advertised name `Nikko-badge(BLE)` reported | [I] and [W] |
+| NIKKO (Pulse) | nn20 BLE confirmed (service 0x01F0, MTU 512, write 0x01F1, notify 0x01F2); advertised name `beambox e-Badge Pulse`, service 0xAF30 | [H] (live/p1/first-contact-20261015-002059.md) |
 | BadgeSdk / Jieli RCSP (C2E6FD00, 0xAE00, E1/SAFER+ auth) | used by the app when the advertised name contains NEO or B-Device (name test, not the server record); also needs 0xAE00 on the device | [C] for app logic (S6 2026-10-12), no model confirmed to use it |
 | Wi-Fi (badge access point, TCP 192.168.8.1:8080) | used by the app for product records of type WiFi | [C] for app logic, which model uses it is [U] |
 

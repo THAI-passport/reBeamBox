@@ -570,3 +570,9 @@ Entry format: date, phase, problem, cause, solution (or Status: Unsolved plus wh
 - Evidence: `rebeambox probe 5301DFC1-xxxx --qualify` against `Watch Ultra` connected and read MTU (256) and battery (0x4A / 74%), but reported `FAIL: transport none`. Services present: Battery (0x180F), Device Info (0x180A), 0xFF10, 0xFF12, Nordic UART Service (6E400001-B5A3-F393-E0A9-E50E24DCCA9F), and 0xFF00. Manufacturer data: `0x314C: 4142d013d7cc1234`.
 - Cause: The target device is a C900 / Watch Ultra smartwatch clone (Bluetrum AB56xx running the HryFine / Nordic UART protocol; see `budget_smartwatch.md`) rather than a Beambox-family e-badge (`nn20` or Jieli `BadgeSdk`).
 - Solution: Phase 1 stop condition triggered as specified in `docs/live-test-phases.md` ("Stop if neither 0x01F0 nor the 0x9E/RCSP service. Write nothing"). Zero flash writes attempted. Status: Solved (safe-write and stop conditions honoured; protocol mismatch documented).
+
+## 82. Bluetooth scan aborts (exit 134) when run from the Claude desktop app
+- Date: 2026-10-15. Phase: Live P3 (pre-write check).
+- Evidence: `rebeambox scan --all --timeout 10` exits 134 (SIGABRT) with no output when launched by the Claude desktop app's shell, with or without its sandbox. The same command worked from the IDE terminal used for P1.
+- Cause: [I] macOS privacy (TCC) kills a process that touches CoreBluetooth when the responsible app has no Bluetooth permission.
+- Solution: grant Bluetooth to the Claude app (System Settings, Privacy and Security, Bluetooth) and restart it, or run the live commands from a terminal that already has the permission. Status: Open until the owner chooses.

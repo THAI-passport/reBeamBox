@@ -67,3 +67,5 @@ Earlier day-to-day detail lives in those logs; new work appends here.
   - **Rationale:** compare app and client byte for byte before spending more writes; the only difference found is the frame count.
 - **Step:** P5 done (text, 5 s and 10 s clips, writes 6-8); NIKKO video cap set to 10 s from the hardware result; P6 and P7 skipped with reasons (problem 90). Live writes total: 8 of 18.
   - **Rationale:** each further write costs flash and the remaining 5.4 MB; the open questions are answered without them.
+- **Step:** Post-upload hold (problem 91) verified on the Pulse with write 9: upload shown at once, like the vendor app.
+  - **Rationale:** the vendor capture showed the app staying connected until the badge drops the link; matching that was the only behavioural difference left.

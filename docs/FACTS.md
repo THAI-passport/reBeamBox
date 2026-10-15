@@ -59,8 +59,8 @@ The app has no model table; the choice comes from a server product list and runt
 |---|---|---|
 | Retail claim for Pulse | video up to 3 s | [W] |
 | App video trimmer window | 10 s, NIJI 5 s | [C] |
-| Client default cap | 3 s for every model, NIJI 5 s (`--max-seconds` overrides) | design choice |
-| Real limit on hardware | unknown | [U] (hardware test H7) |
+| Client default cap | NIKKO 10 s (from the hardware result), other models 3 s, NIJI 5 s (`--max-seconds` overrides) | design choice |
+| Real limit on hardware | Pulse: a 10 s, 15 fps, 368x368 clip (3.48 MB) uploads and plays fully; longer not tried (app trimmer stops at 10 s) | [H] 2026-10-16, docs/problem_solution.md 90 |
 
 ## 6. Battery
 

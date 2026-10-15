@@ -8,7 +8,7 @@ def parse(argv):
 def test_profiles_exist_and_are_consistent():
     assert set(models.PROFILES) == {"nikko", "nano", "niji"}
     assert models.get("NIJI").video_max_s == 5.0           # code: trimmer caps NIJI at 5 s
-    assert models.get("nikko").video_max_s == 3.0
+    assert models.get("nikko").video_max_s == 10.0          # [H] Pulse plays a 10 s clip (problem 90)
     assert all(p.size == 368 for p in models.PROFILES.values())
     assert models.get("pulse") is None
 

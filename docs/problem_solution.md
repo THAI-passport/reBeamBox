@@ -624,3 +624,9 @@ Entry format: date, phase, problem, cause, solution (or Status: Unsolved plus wh
 - Evidence [H]: write 6 `send-text "Test"` displays fine. Write 7 `send-video clip5.mp4 --max-seconds 5 --fps 15`: free space 10608 -> 8876 KB (1732 KB) in 89.95 s, `GetPacketSuccess`, shown at once, smooth. Write 8 `clip10.mp4 --max-seconds 10`: 8876 -> 5400 KB (3476 KB) in 176.94 s, plays the full 10 s. Throughput in no-ACK mode, MTU 512, 20 ms packet interval: about 19.6-19.7 KB/s including connect; the vendor app (about 18 ms per packet) reached a similar rate. The retail "3 s" claim does not hold for this unit.
 - Cause: the client cap of 3 s came from the retail listing.
 - Solution: NIKKO `video_max_s` raised to 10.0 (the app's trimmer maximum), FACTS.md section 5 updated, tests updated. P6 extra writes skipped: P3-P5 already give throughput at 3 payload sizes. P7 skipped: no E-Badge SSID (P1 report); the Pulse is BLE only. Free space left 5400 KB: one more 10 s clip at most; older items have to be deleted on the badge before more large tests. Status: Solved.
+
+## 91. Uploads go to the gallery instead of showing at once
+- Date: 2026-10-16. Phase: Live follow-up.
+- Evidence: the vendor capture (problem 87) shows the app stays connected after the last packet; the badge sends `GetPacketSuccess` at +0.41 s, status pushes every second, and the badge itself ends the link at +9.4 s (HCI disconnect complete, reason 0x13). Our client disconnected 1.1 s after the last packet (guard time). Vendor uploads show at once; ours mostly do not.
+- Cause: [I] the badge switches to the new item only if the host is still connected when it finishes processing.
+- Solution: `POST_UPLOAD_HOLD_S = 10.0` in session.py; after an nn20 upload on a real link the client waits until the badge drops the link (or 10 s). New `Link.wait_disconnect`. Status: Fixed in code; hardware check pending.

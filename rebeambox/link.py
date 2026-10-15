@@ -30,6 +30,10 @@ class Link:
     async def close(self):
         pass
 
+    async def wait_disconnect(self, timeout):
+        """Wait until the device drops the link; True if it did within timeout. Simulated links return at once."""
+        return False
+
     async def reconnect(self):
         raise NotImplementedError("this link cannot reconnect")
 
@@ -93,6 +97,15 @@ class BleakLink(Link):
 
     async def close(self):
         await self._client.disconnect()
+
+    async def wait_disconnect(self, timeout):
+        import asyncio
+        end = asyncio.get_running_loop().time() + timeout
+        while self._client.is_connected:
+            if asyncio.get_running_loop().time() >= end:
+                return False
+            await asyncio.sleep(0.1)
+        return True
 
 
 class RecordingLink(Link):

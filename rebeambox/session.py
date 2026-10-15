@@ -301,6 +301,7 @@ class Nn20Session:
         for _t, text in msgs:
             if "GetPacketSuccess" in text:
                 self._acks.put_nowait("ok")
+                self.log("badge reply: GetPacketSuccess")
             elif "GetPacketFail" in text:
                 self._acks.put_nowait("fail")
             elif len(text) > 30:

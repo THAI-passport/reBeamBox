@@ -50,3 +50,10 @@ Earlier day-to-day detail lives in those logs; new work appends here.
 - **Step:** Executed passive scan and `rebeambox probe 3F81ED53-xxxx --qualify --timeout 15 --wait 6 --report-dir live/p1` against physical badge `beambox e-Badge Pulse` (`3F81ED53-xxxx`).
   - **Rationale:** First-contact qualification on the actual Beambox hardware.
   - **Result:** [H] PASS. Transport: `nn20` (service `000001f0`, write char `000001f1` handle 65, notify char `000001f2` handle 67). Negotiated MTU: 512 (446 data bytes/packet). Handshake status JSON successfully pushed on 0x01F2 and parsed: `size: 368,368`, `freespace: 13876` KB, `time_mode: 1`, keys (`allspace`, `brand`, `devname`, `freespace`, `size`, `time_mode`, `type`). 0 flash writes used.
+
+## 2026-10-15 — handoff picked up, address masked
+
+- **Step:** Replaced the full CoreBluetooth UUID in `docs/HANDOFF-live-testing.md` with the masked form and a local `$BADGE` variable.
+  - **Rationale:** AGENTS.md forbids identifiers in committed files; the handoff itself said to mask it.
+- **Step:** Read-only `scan --all --timeout 15` before P3: badge not advertising. P3 held until the owner wakes the badge and disconnects the phone app.
+  - **Rationale:** Rule 8 (one central) and the handoff note that the badge sleeps when disconnected.

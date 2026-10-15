@@ -582,3 +582,9 @@ Entry format: date, phase, problem, cause, solution (or Status: Unsolved plus wh
 - Evidence: `send-image --model nikko` on the Pulse printed no `badge status` line, chose ACK mode and aborted after about 10 s at packet 0. In P1 `probe --qualify` (which waits up to 3 s) received `time_mode: 1`. Upload counter stayed 0.
 - Cause: `Nn20Session.start` waited 50 ms after enabling notify; the badge pushes its status later, so `time_mode` was unknown and the client waited for ACKs a no-ACK badge never sends.
 - Solution: `STATUS_WAIT_S = 2.0` in `rebeambox/session.py`: wait up to 2 s for the status before sending, log when it does not come. Status: Fixed in code; hardware retry pending.
+
+## 84. Upload completes but the Pulse shows its own logo, not the image
+- Date: 2026-10-15. Phase: Live P3.
+- Evidence: after the problem 83 fix, `send-image gradient_label.png --model nikko` (nn20, type 5 one-frame container, no-ACK, 368x368) finished in 3.65 s with exit 0 and counted 1 write. The owner reports the screen shows the Beambox logo, clean, not the test image. No `GetPacketSuccess`/`GetPacketFail` text was logged. The status in this session said `allspace=16384`, while the handoff recorded 32000.
+- Cause: unknown. Candidates [I]: the type 5 container is not what this firmware displays for stills (app code uses type 6 album); the badge stored it but needs a separate play or select step; the stream was dropped silently in no-ACK mode.
+- Solution: Status: Open. Next: one write with `--nn20-still album` (type 6). If that also shows the logo, stop writing and take a vendor app capture (P2) to compare.

@@ -61,3 +61,5 @@ Earlier day-to-day detail lives in those logs; new work appends here.
   - **Rationale:** the CLI has no Info.plist, so it can never be granted Bluetooth; Terminal already has the permission.
 - **Step:** P3 attempt 1 failed (problem 83); owner approved the status-wait fix; tests pass. Retry blocked: badge asleep.
   - **Rationale:** without the status the client picks ACK mode on a no-ACK badge.
+- **Step:** P3/P4: type 5 and type 6 stills both stored (free space drops 16 KB each) but the Pulse keeps showing its logo. Badge Bluetooth turns off after each upload; owner re-enables it. Stopped writing at 2 of 18.
+  - **Rationale:** a third format test would not separate "not stored" from "not displayed"; the free-space numbers already show storage works. The missing piece is what the vendor app sends, so the vendor capture is the next step.

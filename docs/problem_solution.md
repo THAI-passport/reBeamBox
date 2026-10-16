@@ -546,3 +546,93 @@ Entry format: date, phase, problem, cause, solution (or Status: Unsolved plus wh
 - Cause: OTA was thought of as a separate service; the ledger chose availability over safety.
 - Solution: opcode block 0xE0-0xEF in `rcsp.pack` and in BleakLink/RecordingLink (PROTOCOL 3.7.3); the ledger refuses writes, even with `--force`, until `rebeambox uploads --reset`. Tests added; the old test that pinned the reset behaviour now pins the new rule. Status: Solved in code; untested on hardware (no OTA frame is ever sent, so nothing to test there).
 
+## 78. zsh glob error on pip install -e .[test]
+- Date: 2026-10-14. Phase: Live P0.
+- Evidence: Running `pip install -e .[test]` in zsh produces `zsh: no matches found: .[test]`.
+- Cause: zsh interprets square brackets as pattern globbing instead of pip extra syntax.
+- Solution: Quote the target as `'.[test]'` or `'rebeambox[test]'`. Status: Solved.
+
+## 79. bleak.__version__ AttributeError in bleak >= 0.22 / 3.0
+- Date: 2026-10-14. Phase: Live P0.
+- Evidence: `python -c "import bleak; print(bleak.__version__)"` failed with `AttributeError: module 'bleak' has no attribute '__version__'`.
+- Cause: Newer versions of bleak (installed: 3.0.2) do not expose `__version__` on the top-level package namespace.
+- Solution: Query package version via `importlib.metadata.version('bleak')`. Status: Solved.
+
+
+## 80. Live test brief written on a stale branch
+- Date: 2026-10-14. Phase: Live planning.
+- Evidence: `docs/live-test-phases.md` was first written on `docs/grok-improvements` after a `git pull` that only updated that branch; `origin/main` already held problems 57-77, the daily write cap, the `--model` size fix, `docs/steps.md` and AGENTS.md. The brief told agents to number problems from 57 and did not mention steps.md (found by an external review).
+- Cause: the planner checked the current branch only, not how far it was behind `main`.
+- Solution: branch merged with main, feat/steps-log and integration; brief rewritten: branch check, last+1 numbering, steps.md, on-disk redaction with `tools/scrub_capture.py`, recon before vendor capture, owner screen confirmation, write budget cut from 31 to 18 (boundary video search, throughput from existing sends), Wi-Fi persistence and second-network pre-check. Lesson: before planning, run `git fetch --all` and compare the branch with `origin/main`. Status: Solved.
+
+## 81. Live P1 recon target lacks nn20 (0x01F0) and RCSP (0xAE00) services
+- Date: 2026-10-14. Phase: Live P1.
+- Evidence: `rebeambox probe 5301DFC1-xxxx --qualify` against `Watch Ultra` connected and read MTU (256) and battery (0x4A / 74%), but reported `FAIL: transport none`. Services present: Battery (0x180F), Device Info (0x180A), 0xFF10, 0xFF12, Nordic UART Service (6E400001-B5A3-F393-E0A9-E50E24DCCA9F), and 0xFF00. Manufacturer data: `0x314C: 4142d013d7cc1234`.
+- Cause: The target device is a C900 / Watch Ultra smartwatch clone (Bluetrum AB56xx running the HryFine / Nordic UART protocol; see `budget_smartwatch.md`) rather than a Beambox-family e-badge (`nn20` or Jieli `BadgeSdk`).
+- Solution: Phase 1 stop condition triggered as specified in `docs/live-test-phases.md` ("Stop if neither 0x01F0 nor the 0x9E/RCSP service. Write nothing"). Zero flash writes attempted. Status: Solved (safe-write and stop conditions honoured; protocol mismatch documented).
+
+## 82. Bluetooth scan aborts (exit 134) when run from the Claude desktop app
+- Date: 2026-10-15. Phase: Live P3 (pre-write check).
+- Evidence: `rebeambox scan --all --timeout 10` exits 134 (SIGABRT) with no output when launched by the Claude desktop app's shell, with or without its sandbox. The same command worked from the IDE terminal used for P1.
+- Cause: [I] macOS privacy (TCC) kills a process that touches CoreBluetooth when the responsible app has no Bluetooth permission.
+- Solution: grant Bluetooth to the Claude app (System Settings, Privacy and Security, Bluetooth) and restart it, or run the live commands from a terminal that already has the permission. Status: Open until the owner chooses.
+
+## 83. First write failed: "badge did not acknowledge packet 0"
+- Date: 2026-10-15. Phase: Live P3.
+- Evidence: `send-image --model nikko` on the Pulse printed no `badge status` line, chose ACK mode and aborted after about 10 s at packet 0. In P1 `probe --qualify` (which waits up to 3 s) received `time_mode: 1`. Upload counter stayed 0.
+- Cause: `Nn20Session.start` waited 50 ms after enabling notify; the badge pushes its status later, so `time_mode` was unknown and the client waited for ACKs a no-ACK badge never sends.
+- Solution: `STATUS_WAIT_S = 2.0` in `rebeambox/session.py`: wait up to 2 s for the status before sending, log when it does not come. Status: Fixed in code; hardware retry pending.
+
+## 84. Upload completes but the Pulse shows its own logo, not the image
+- Date: 2026-10-15. Phase: Live P3.
+- Evidence: after the problem 83 fix, `send-image gradient_label.png --model nikko` (nn20, type 5 one-frame container, no-ACK, 368x368) finished in 3.65 s with exit 0 and counted 1 write. The owner reports the screen shows the Beambox logo, clean, not the test image. No `GetPacketSuccess`/`GetPacketFail` text was logged. The status in this session said `allspace=16384`, while the handoff recorded 32000.
+- Cause: unknown. Candidates [I]: the type 5 container is not what this firmware displays for stills (app code uses type 6 album); the badge stored it but needs a separate play or select step; the stream was dropped silently in no-ACK mode.
+- Solution: Status: Open. Next: one write with `--nn20-still album` (type 6). If that also shows the logo, stop writing and take a vendor app capture (P2) to compare.
+
+## 85. Pulse stops advertising after the first upload
+- Date: 2026-10-16. Phase: Live P4 (attempted).
+- Evidence: after the problem 84 upload, the badge is absent from `scan --all` (15, 20 and 60 s) and from direct connects (3 attempts), on the QR "scan to download" Bluetooth page and after a full power-cycle. No device in range advertises 0xAF30 or 0x01F0; the Mac shows no connection to it; the owner's phone Bluetooth is off and has never paired with it. Other devices nearby are seen, so the host scanner works.
+- Cause: unknown. Candidates [I]: the firmware is stuck processing the upload (would match "logo shown, no change"); it stopped advertising after binding to this Mac; it advertises only on a menu entry not yet tried.
+- Solution: Status: Open. No further writes until it advertises again.
+
+## 86. Type 6 album still is also stored but not shown
+- Date: 2026-10-16. Phase: Live P4.
+- Evidence: `send-image --nn20-still album` (write 2) finished in 3.64 s, exit 0; the owner reports the logo is still shown. Free space read from the pushed status: 13876 KB before write 1, 13860 KB before write 2, 13844 KB after (read-only `probe --qualify`). So each upload of about 13 KB is stored (16 KB step), for both type 5 and type 6. Problem 85 resolved by the owner: the badge's Bluetooth turns off after an upload and the owner turns it back on from the badge.
+- Cause: unknown [I]: the firmware stores uploads but needs a separate select or play step the client does not send, or shows them only from its own gallery menu. Contradicts the [W] report in PROTOCOL.md (type 5 displays at once), which may be another model or firmware.
+- Solution: Status: Open. Writes paused at 2 of 18. Next, no-write first: owner checks the badge menus for a gallery of uploads; then a vendor app reference capture (P2) to see what the app sends around the upload.
+
+## 87. Vendor app reference capture (P2): same framing, multi-frame animation
+- Date: 2026-10-16. Phase: Live P2.
+- Evidence: HCI snoop from a vivo V2319 (Android 16), pulled with `adb bugreport` (the log is not readable directly). The app sent one video: MTU 512, CCCD on 0x01F2, then 6872 write-without-response packets of 458 bytes (446 data), header `F1 05 <total> <remaining> <len>`, envelope `{"type":5,"data":...}`, 0x12345678 container, 200 frames at 50 ms, 368x368, about 18 ms per packet. No type 13 settings frame. The badge pushes the status JSON every second; `GetPacketSuccess` came 0.41 s after the last packet, then free space fell 13844 -> 10848 KB. The owner saw the video play. [H]
+- Cause of problem 84/86 [I]: framing, envelope, container and timing match ours; the remaining difference is frame count (ours: 1 frame, 3000 ms). The firmware may not display a one-frame animation.
+- Solution: Status: Open. Test with a multi-frame GIF next; client now logs `GetPacketSuccess`.
+
+## 88. "Logo" was the gallery: uploads are stored as gallery items
+- Date: 2026-10-16. Phase: Live P3-P5.
+- Evidence: after `send-gif party.gif` (write 3, `GetPacketSuccess` received) the screen blinked and the badge showed its gallery; the owner swiped past the vendor-uploaded video to the animation, which plays smoothly with some flicker in the top right. The gradient still from write 1 or 2 was in the gallery all along (the owner had taken it for a stock image): colours per corner match the source (TL blue, TR pink, BL green, BR yellow), so orientation is correct; corner labels are outside the round visible area. It appears once although two stills were stored (free space fell 16 KB each time). Vendor-app uploads are shown at once; ours are not.
+- Cause: problems 84 and 86 were not display failures; the result check looked at the wrong screen. [U] which of type 5 or type 6 is listed, why the vendor upload is shown immediately, and the top-right flicker.
+- Solution: problems 84 and 86 closed as "displayed in gallery". Next: send distinct red (type 5) and blue (type 6) stills to see which is listed. Status: Partly solved.
+
+## 89. Type 5 and type 6 stills both display; gallery list refresh is delayed
+- Date: 2026-10-16. Phase: Live P4.
+- Evidence: write 4 `send-image red.png` (type 5 one-frame container) and write 5 `send-image blue.png --nn20-still album` (type 6 IMB), each 3.6-3.9 s, each answered `GetPacketSuccess`; free space 10640 -> 10628 KB after red. Right after write 4 the owner saw no red item; after write 5 both red and blue were listed. The badge only advertises on its Bluetooth/QR page; on the gallery page it is not found. [H]
+- Cause: [I] the gallery list is rebuilt later (on leaving the QR page or on the next upload), not at the end of each transfer. The gradient appearing once out of two stills (problem 88) is still [U]: possibly dedup by content.
+- Solution: both still modes work on the Pulse; keep type 5 as the default (`still_mode` unchanged). Procedure: before each send put the badge on its Bluetooth/QR page with Bluetooth on; judge results from the gallery after leaving that page. Status: Solved for still modes; refresh timing open.
+
+## 90. Video limit and BLE throughput measured on the Pulse
+- Date: 2026-10-16. Phase: Live P5-P7.
+- Evidence [H]: write 6 `send-text "Test"` displays fine. Write 7 `send-video clip5.mp4 --max-seconds 5 --fps 15`: free space 10608 -> 8876 KB (1732 KB) in 89.95 s, `GetPacketSuccess`, shown at once, smooth. Write 8 `clip10.mp4 --max-seconds 10`: 8876 -> 5400 KB (3476 KB) in 176.94 s, plays the full 10 s. Throughput in no-ACK mode, MTU 512, 20 ms packet interval: about 19.6-19.7 KB/s including connect; the vendor app (about 18 ms per packet) reached a similar rate. The retail "3 s" claim does not hold for this unit.
+- Cause: the client cap of 3 s came from the retail listing.
+- Solution: NIKKO `video_max_s` raised to 10.0 (the app's trimmer maximum), FACTS.md section 5 updated, tests updated. P6 extra writes skipped: P3-P5 already give throughput at 3 payload sizes. P7 skipped: no E-Badge SSID (P1 report); the Pulse is BLE only. Free space left 5400 KB: one more 10 s clip at most; older items have to be deleted on the badge before more large tests. Status: Solved.
+
+## 91. Uploads go to the gallery instead of showing at once
+- Date: 2026-10-16. Phase: Live follow-up.
+- Evidence: the vendor capture (problem 87) shows the app stays connected after the last packet; the badge sends `GetPacketSuccess` at +0.41 s, status pushes every second, and the badge itself ends the link at +9.4 s (HCI disconnect complete, reason 0x13). Our client disconnected 1.1 s after the last packet (guard time). Vendor uploads show at once; ours mostly do not.
+- Cause: [I] the badge switches to the new item only if the host is still connected when it finishes processing.
+- Solution: `POST_UPLOAD_HOLD_S = 10.0` in session.py; after an nn20 upload on a real link the client waits until the badge drops the link (or 10 s). New `Link.wait_disconnect`. Verified [H] 2026-10-16 (write 9, photo.jpg): the photo appeared on screen by itself; the badge kept the link open the full 10 s and pushed status every second. The minimum hold that still works is not measured. Status: Solved.
+
+## 92. Shortest post-upload hold
+- Date: 2026-10-16. Phase: Live follow-up.
+- Evidence [H]: one distinct solid-colour still per run with `--post-upload-hold-s`: 5 s (write 10), 2 s (11), 1 s (12) each shown on screen at once; 0 s (13, old behaviour: only the 1.1 s guard time) went to the gallery while the screen kept the previous item. Each answered `GetPacketSuccess`; the badge never closed the link itself inside the hold.
+- Cause: the badge needs the host connected for between about 1.1 s and 2.1 s after the last packet to switch to the new item.
+- Solution: default `POST_UPLOAD_HOLD_S` 2.0 s (1 s worked once; 2 s keeps margin); `--post-upload-hold-s` overrides, 0 turns it off. Status: Solved.

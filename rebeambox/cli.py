@@ -3,7 +3,7 @@ import argparse
 import asyncio
 import sys
 
-from . import __version__, client, link, media, models, safewrite, scan as scanmod, sim, streaming, wifi
+from . import __version__, client, link, media, models, safewrite, session, scan as scanmod, sim, streaming, wifi
 
 
 def _add_common(p):
@@ -22,6 +22,7 @@ def _add_common(p):
     p.add_argument("--model", choices=sorted(models.PROFILES), help="badge model: adds its name filter, sets default size, video cap and still encoding")
     p.add_argument("--nn20-still", choices=["gif", "album"], help="nn20 stills: gif = type 5 one-frame container (default), album = type 6 IMB")
     p.add_argument("--packet-interval-ms", type=float, default=20.0, help="nn20 gap between packets in ms (default 20)")
+    p.add_argument("--post-upload-hold-s", type=float, default=None, help="nn20: seconds to stay connected after an upload so the badge shows it at once (default %.0f, 0 = off)" % session.POST_UPLOAD_HOLD_S)
     p.add_argument("--ack-batch-size", type=int, default=4, help="nn20 ACK mode: packets per batch (default 4, falls back to 1 after errors)")
     g = p.add_argument_group("safe-write policy (flash protection, docs/safe-write.md; not applied to --dry-run)")
     g.add_argument("--min-interval-s", type=float, default=safewrite.DEFAULT_MIN_INTERVAL_S, help="minimum seconds between writes to one badge (default 30)")
@@ -275,7 +276,8 @@ async def _run_send(args):
     try:
         await client.send(lk, job, args.transport, args.size, log, progress=None if args.quiet else
                           (lambda p: print("\r%3d%%" % p, end="", file=sys.stderr)),
-                          packet_interval_ms=args.packet_interval_ms, ack_batch_size=args.ack_batch_size, gate=gate)
+                          packet_interval_ms=args.packet_interval_ms, ack_batch_size=args.ack_batch_size, gate=gate,
+                          hold_s=args.post_upload_hold_s)
         log("\ndone")
     finally:
         await lk.close()

@@ -22,11 +22,11 @@ Update the row when the state changes; link the result file.
 ## Hardware (needs a badge; see HW-RECON.md)
 | Task | Title | State | Owner | Result |
 |---|---|---|---|---|
-| HW-0 | Run sheet, approvals, write budget | todo | | |
+| HW-0 | Run sheet, approvals, write budget | done | User + AI | docs/live-test-phases.md (18-write budget approved) |
 | HW-1 | Reference capture with the vendor app | todo | | |
-| HW-2 | Scan and qualify (H1) | todo | | |
+| HW-2 | Scan and qualify (H1) | done | AI + User | live/p1/first-contact-20261015-002059.md (PASS: nn20, MTU 512, size 368x368) |
 | HW-3 | Wi-Fi presence survey | todo | | |
-| HW-4 | Dry runs | todo | | |
+| HW-4 | Dry runs | done | AI | live/p0/ (dry runs written, payloads verified) |
 | HW-5 | Still container test (H2) | todo | | |
 | HW-6 | Picture size and shape | todo | | |
 | HW-7 | Free space and rewrite behaviour (H8) | todo | | |

@@ -80,7 +80,7 @@ def test_gif_very_short_delays_are_clamped(tmp_path):
     assert interval >= media.MIN_INTERVAL_MS and len(frames) == 8
 
 
-@pytest.mark.parametrize("key,cap", [("nikko", 3.0), ("nano", 3.0), ("niji", 5.0)])
+@pytest.mark.parametrize("key,cap", [("nikko", 10.0), ("nano", 3.0), ("niji", 5.0)])
 def test_long_gif_is_capped_to_the_model_limit(tmp_path, key, cap):
     p = tmp_path / "long.gif"
     _gif(p, [100] * 100)                                          # 10 s
@@ -100,7 +100,7 @@ def _make_video(path, seconds):
         pytest.skip("ffmpeg could not create a test video: %s" % r.stderr[-200:])
 
 
-@pytest.mark.parametrize("key", ["nikko", "niji"])
+@pytest.mark.parametrize("key", ["nano", "niji"])
 def test_video_longer_than_model_cap_is_trimmed(tmp_path, key):
     v = tmp_path / "long.avi"
     _make_video(v, 8)

@@ -6,7 +6,9 @@ import time
 from . import control, jl_auth, nn20, rcsp
 
 FREE_SPACE_MARGIN = 1024 * 1024    # [C] the app refuses when payload + 1 MiB (0x100000 in smali) exceeds the reported free KB * 1024
-ACK_ABORT_FAILURES = 3             # [C] the app gives up on the third failure of one upload (two retries, waits 500 and 1000 ms)
+STATUS_WAIT_S = 2.0                # [H] the Pulse pushes its status JSON shortly after notify is enabled; its time_mode picks no-ACK vs ACK
+POST_UPLOAD_HOLD_S = 2.0           # [H] Pulse: shown at once with 10, 5, 2 and 1 s, sent to the gallery with 0 (problem 92); 2 s keeps a margin
+ACK_ABORT_FAILURES = 3           # [C] the app gives up on the third failure of one upload (two retries, waits 500 and 1000 ms)
 AE00 = "0000ae00-0000-1000-8000-00805f9b34fb"
 AE01 = "0000ae01-0000-1000-8000-00805f9b34fb"
 AE02 = "0000ae02-0000-1000-8000-00805f9b34fb"
@@ -283,7 +285,7 @@ class Nn20Session:
     without per-batch ACKs; on a GetPacketFail or a write error (drop or disconnect) the session falls back to ACK
     batches and restarts the transfer from the first packet (the first packet of a stream starts a new upload)."""
 
-    def __init__(self, link, log=lambda *_: None, guard_scale=1.0, interval=0.02, ack_batch=4):
+    def __init__(self, link, log=lambda *_: None, guard_scale=1.0, interval=0.02, ack_batch=4, hold_s=POST_UPLOAD_HOLD_S):
         if interval < 0 or ack_batch < 1:
             raise ValueError("interval must be >= 0 and ack_batch >= 1")
         self.link, self.log, self.guard_scale, self.interval = link, log, guard_scale, interval
@@ -293,6 +295,7 @@ class Nn20Session:
         self.modes = []             # trace of the modes used, for logs and tests
         self._buf = b""
         self._acks = asyncio.Queue()
+        self.hold_s = hold_s
 
     def _on_notify(self, data):
         self._buf += data
@@ -300,6 +303,7 @@ class Nn20Session:
         for _t, text in msgs:
             if "GetPacketSuccess" in text:
                 self._acks.put_nowait("ok")
+                self.log("badge reply: GetPacketSuccess")
             elif "GetPacketFail" in text:
                 self._acks.put_nowait("fail")
             elif len(text) > 30:
@@ -314,6 +318,11 @@ class Nn20Session:
     async def start(self):
         await self.link.subscribe(nn20.NOTIFY, self._on_notify)
         await asyncio.sleep(0.05)
+        end = asyncio.get_running_loop().time() + STATUS_WAIT_S
+        while not self.status and asyncio.get_running_loop().time() < end:
+            await asyncio.sleep(0.05)
+        if not self.status:
+            self.log("no status JSON within %.1f s: time_mode unknown, using ACK mode" % STATUS_WAIT_S)
         self.log("MTU %d, %d data bytes per packet" % (self.link.mtu, nn20.data_per_packet(self.link.mtu)))
 
     async def _wr(self, f):
@@ -338,6 +347,11 @@ class Nn20Session:
             self.modes.append("ack")
             await self._send_acked(frames, progress)
         await asyncio.sleep(nn20.guard_time_ms(n) / 1000 * self.guard_scale)
+        if self.guard_scale and self.hold_s > 0:
+            if await self.link.wait_disconnect(self.hold_s):
+                self.log("badge closed the link after the upload")
+            else:
+                self.log("badge kept the link open %.1f s after the upload" % self.hold_s)
 
     def _saw_fail(self):
         failed = False

@@ -9,8 +9,8 @@ Update the row when the state changes; link the result file.
 | S0 | Baseline: environment, tests, rules | done | AI | suite green, 2 skips (2026-10-12) |
 | S1 | Rebuild or obtain the analysis tree | done | AI | results/S1-2026-10-12.md (tree and hashes verified, no rebuild) |
 | S2 | Audit the unconfirmed claims in PROTOCOL.md | done | AI | results/S2-2026-10-12.md (22 claims, 4 contradicted and fixed) |
-| S3 | Static inventory of the vendor server API | todo | | |
-| S4 | Static inventory of the firmware update path | todo | | |
+| S3 | Static inventory of the vendor server API | done | AI | results/S3-2026-10-12.md |
+| S4 | Static inventory of the firmware update path | done | AI | results/S4-2026-10-12.md |
 | S5 | Inventory of everything the badge can send to the app | done | AI | results/S5-2026-10-12.md |
 | S6 | Scan filter and model detection audit | done | AI | results/S6-2026-10-12.md (watch tag fixed) |
 | S7 | Test media and payload size table | done | AI | results/S7-2026-10-12.md |

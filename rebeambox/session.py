@@ -285,7 +285,7 @@ class Nn20Session:
     without per-batch ACKs; on a GetPacketFail or a write error (drop or disconnect) the session falls back to ACK
     batches and restarts the transfer from the first packet (the first packet of a stream starts a new upload)."""
 
-    def __init__(self, link, log=lambda *_: None, guard_scale=1.0, interval=0.02, ack_batch=4):
+    def __init__(self, link, log=lambda *_: None, guard_scale=1.0, interval=0.02, ack_batch=4, hold_s=POST_UPLOAD_HOLD_S):
         if interval < 0 or ack_batch < 1:
             raise ValueError("interval must be >= 0 and ack_batch >= 1")
         self.link, self.log, self.guard_scale, self.interval = link, log, guard_scale, interval
@@ -295,6 +295,7 @@ class Nn20Session:
         self.modes = []             # trace of the modes used, for logs and tests
         self._buf = b""
         self._acks = asyncio.Queue()
+        self.hold_s = hold_s
 
     def _on_notify(self, data):
         self._buf += data
@@ -346,11 +347,11 @@ class Nn20Session:
             self.modes.append("ack")
             await self._send_acked(frames, progress)
         await asyncio.sleep(nn20.guard_time_ms(n) / 1000 * self.guard_scale)
-        if self.guard_scale:
-            if await self.link.wait_disconnect(POST_UPLOAD_HOLD_S):
+        if self.guard_scale and self.hold_s > 0:
+            if await self.link.wait_disconnect(self.hold_s):
                 self.log("badge closed the link after the upload")
             else:
-                self.log("badge kept the link open %.0f s after the upload" % POST_UPLOAD_HOLD_S)
+                self.log("badge kept the link open %.1f s after the upload" % self.hold_s)
 
     def _saw_fail(self):
         failed = False

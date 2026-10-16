@@ -630,3 +630,9 @@ Entry format: date, phase, problem, cause, solution (or Status: Unsolved plus wh
 - Evidence: the vendor capture (problem 87) shows the app stays connected after the last packet; the badge sends `GetPacketSuccess` at +0.41 s, status pushes every second, and the badge itself ends the link at +9.4 s (HCI disconnect complete, reason 0x13). Our client disconnected 1.1 s after the last packet (guard time). Vendor uploads show at once; ours mostly do not.
 - Cause: [I] the badge switches to the new item only if the host is still connected when it finishes processing.
 - Solution: `POST_UPLOAD_HOLD_S = 10.0` in session.py; after an nn20 upload on a real link the client waits until the badge drops the link (or 10 s). New `Link.wait_disconnect`. Verified [H] 2026-10-16 (write 9, photo.jpg): the photo appeared on screen by itself; the badge kept the link open the full 10 s and pushed status every second. The minimum hold that still works is not measured. Status: Solved.
+
+## 92. Shortest post-upload hold
+- Date: 2026-10-16. Phase: Live follow-up.
+- Evidence [H]: one distinct solid-colour still per run with `--post-upload-hold-s`: 5 s (write 10), 2 s (11), 1 s (12) each shown on screen at once; 0 s (13, old behaviour: only the 1.1 s guard time) went to the gallery while the screen kept the previous item. Each answered `GetPacketSuccess`; the badge never closed the link itself inside the hold.
+- Cause: the badge needs the host connected for between about 1.1 s and 2.1 s after the last packet to switch to the new item.
+- Solution: default `POST_UPLOAD_HOLD_S` 2.0 s (1 s worked once; 2 s keeps margin); `--post-upload-hold-s` overrides, 0 turns it off. Status: Solved.

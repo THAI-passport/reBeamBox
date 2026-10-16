@@ -69,3 +69,5 @@ Earlier day-to-day detail lives in those logs; new work appends here.
   - **Rationale:** each further write costs flash and the remaining 5.4 MB; the open questions are answered without them.
 - **Step:** Post-upload hold (problem 91) verified on the Pulse with write 9: upload shown at once, like the vendor app.
   - **Rationale:** the vendor capture showed the app staying connected until the badge drops the link; matching that was the only behavioural difference left.
+- **Step:** Hold time search, writes 10-13 (5, 2, 1, 0 s); default set to 2 s and the flag `--post-upload-hold-s` added (problem 92).
+  - **Rationale:** halving each step finds the boundary in four writes; 2 s is one step above the shortest pass.

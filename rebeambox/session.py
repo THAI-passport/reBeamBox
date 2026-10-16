@@ -7,7 +7,7 @@ from . import control, jl_auth, nn20, rcsp
 
 FREE_SPACE_MARGIN = 1024 * 1024    # [C] the app refuses when payload + 1 MiB (0x100000 in smali) exceeds the reported free KB * 1024
 STATUS_WAIT_S = 2.0                # [H] the Pulse pushes its status JSON shortly after notify is enabled; its time_mode picks no-ACK vs ACK
-POST_UPLOAD_HOLD_S = 10.0          # [H] the vendor app stays connected until the Pulse drops the link (9.4 s after the last packet); uploads then show at once
+POST_UPLOAD_HOLD_S = 2.0           # [H] Pulse: shown at once with 10, 5, 2 and 1 s, sent to the gallery with 0 (problem 92); 2 s keeps a margin
 ACK_ABORT_FAILURES = 3           # [C] the app gives up on the third failure of one upload (two retries, waits 500 and 1000 ms)
 AE00 = "0000ae00-0000-1000-8000-00805f9b34fb"
 AE01 = "0000ae01-0000-1000-8000-00805f9b34fb"

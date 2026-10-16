@@ -17,7 +17,7 @@ class Profile:
 COMMON_NAMES = ("E-badge",)
 
 PROFILES = {
-    "nikko": Profile("nikko", "NIKKO (Beambox e-Badge Pulse), flagship", ("Nikko",) + COMMON_NAMES, 3.0, 368, "gif",
+    "nikko": Profile("nikko", "NIKKO (Beambox e-Badge Pulse), flagship", ("Nikko",) + COMMON_NAMES, 10.0, 368, "gif",
                      "retail data: 3 s video; app code allows 10 s"),
     "nano": Profile("nano", "NANO (Lite), essential", ("Nano",) + COMMON_NAMES, 3.0, 368, "gif",
                     "same cap as nikko (assumption); app code allows 10 s"),

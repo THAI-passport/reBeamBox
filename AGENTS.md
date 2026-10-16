@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Instructions for AI agents working in this repository (reBeamBox: an open Python client for Beambox-style BLE and Wi-Fi e-badges, written from static analysis, not yet tested on hardware). The generalized, target-agnostic version of this workflow lives in the reWork repo.
+Instructions for AI agents working in this repository (reBeamBox: an open Python client for Beambox-style BLE and Wi-Fi e-badges, written from static analysis; tested on one Beambox e-Badge Pulse, see docs/hardware-results-pulse.md). The generalized, target-agnostic version of this workflow lives in the reWork repo.
 
 ## Read first
 - `docs/problem_solution.md`: every problem hit so far, with cause and fix or an explicit open status. Read it before starting work.

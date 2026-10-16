@@ -3,7 +3,7 @@
 Open-source Python client for Beambox-style round e-badges (Beambox e-Badge Pulse, Beambox+) over Bluetooth LE.
 Sends JPG/PNG stills, GIFs, short videos (3 s default cap) and rendered text or name tags. No vendor account, no cloud, no ads, no telemetry.
 
-STATUS: written from static analysis of the Android app. It has NOT been tested on real hardware. Byte layouts are documented and unit-tested against a software badge, but expect to debug on first contact (see docs/PROTOCOL.md section 6.4). Use `--dry-run` first.
+STATUS: written from static analysis of the Android app and tested on one real Beambox e-Badge Pulse (nn20) on 2026-10-15/16: stills, GIF, text and 10 s video upload and show at once (docs/hardware-results-pulse.md). NANO, NIJI and the Wi-Fi path are still untested on hardware. Use `--dry-run` first.
 
 ## Install
 Python 3.10+ is required. Dependencies are split: core (bleak, Pillow) with `pip install -e .`, `[test]` adds pytest, `[emulation]` adds unicorn, capstone and pyelftools (needed only to re-derive auth test vectors from the native library; those tests skip when the extra or the library is missing). ffmpeg is needed only for GIF and video (stills and text do not need it).

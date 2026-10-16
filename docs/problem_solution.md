@@ -636,3 +636,9 @@ Entry format: date, phase, problem, cause, solution (or Status: Unsolved plus wh
 - Evidence [H]: one distinct solid-colour still per run with `--post-upload-hold-s`: 5 s (write 10), 2 s (11), 1 s (12) each shown on screen at once; 0 s (13, old behaviour: only the 1.1 s guard time) went to the gallery while the screen kept the previous item. Each answered `GetPacketSuccess`; the badge never closed the link itself inside the hold.
 - Cause: the badge needs the host connected for between about 1.1 s and 2.1 s after the last packet to switch to the new item.
 - Solution: default `POST_UPLOAD_HOLD_S` 2.0 s (1 s worked once; 2 s keeps margin); `--post-upload-hold-s` overrides, 0 turns it off. Status: Solved.
+
+## 93. Final checks on main, and the vendor app no longer lists the badge
+- Date: 2026-10-16. Phase: Live wrap-up.
+- Evidence [H]: on merged `main` with no flags: still (write 14) shown at once, 5.5 s; `stream synthetic --transport nn20` (write 15) one clip of 5 frames, shown at once, choppy; GIF (write 16) shown at once. The owner deleted all items from the badge's own gallery menu; free space went back to 13892 KB. Separately, the vendor app on the vivo phone listed nothing; app permissions, Location and Bluetooth were on and the badge was unpaired in Android. The phone's HCI log received the badge's advert (name and 0xAF30) twice in 5 minutes, at -67 and -72 dBm, with no connect attempt after the second one.
+- Cause: [I] the phone's scan duty cycle and the badge's short advertising window rarely overlap, or the app filters the result; not caused by the client (the Mac still sees and uses the badge).
+- Solution: Status: Open for the vendor app (reinstall, battery exemption, longer scan suggested). A planned test of the free-space refusal was dropped: after the gallery was cleared no clip within the 10 s cap is large enough; the unit tests cover it.
